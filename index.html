@@ -19,9 +19,10 @@
 <script src="paystubs.js"></script>
 <style>
 :root{
-  --bg:#FFFFFF; --surface:#FFFFFF; --ink:#212B26; --muted:#5E6B63; --line:#DDE3DE; --soft:#F2F5F1;
-  --accent:#368727; --accent-ink:#FFFFFF; --accent-deep:#1F5E14; --good:#368727; --warn:#B26A00; --bad:#C23B2E;
-  --c1:#368727; --c2:#0E7CB5; --c3:#E0A100; --c4:#7B5EA7; --c5:#C23B2E; --c6:#7A877E;
+  --bg:#F8FBF6; --surface:#FFFFFF; --ink:#22302A; --muted:#62736A; --line:#DCE8D8; --soft:#EEF5EA;
+  --accent:#5FAE4E; --accent-ink:#1B4D12; --accent-deep:#2F7A22; --good:#3E8B31; --warn:#B26A00; --bad:#C23B2E;
+  --btn:#DCEFD5; --btn-ink:#1F5E14; --btn-line:#BBDDB0;
+  --c1:#5FAE4E; --c2:#4A9BD0; --c3:#E0A100; --c4:#8E72B8; --c5:#C23B2E; --c6:#8A978E;
   --display:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
   --body:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
   box-sizing:border-box;
@@ -31,14 +32,16 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#121814; --surface:#1A221D; --ink:#E8EEE9; --muted:#9BAAA0; --line:#2C3830; --soft:#1F2923;
-    --accent:#5DB84A; --accent-ink:#0E1A0B; --accent-deep:#8FD97F; --good:#5DB84A; --warn:#E2B14A; --bad:#F0877A;
-    --c1:#5DB84A; --c2:#58B4E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
+    --accent:#7CC96B; --accent-ink:#0E1A0B; --accent-deep:#9FDB90; --good:#7CC96B; --warn:#E2B14A; --bad:#F0877A;
+    --btn:#27402A; --btn-ink:#CFF0C6; --btn-line:#3A5C3C;
+    --c1:#7CC96B; --c2:#6FB5E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
   }
 }
 :root[data-theme="dark"]{
   --bg:#121814; --surface:#1A221D; --ink:#E8EEE9; --muted:#9BAAA0; --line:#2C3830; --soft:#1F2923;
-  --accent:#5DB84A; --accent-ink:#0E1A0B; --accent-deep:#8FD97F; --good:#5DB84A; --warn:#E2B14A; --bad:#F0877A;
-  --c1:#5DB84A; --c2:#58B4E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
+  --accent:#7CC96B; --accent-ink:#0E1A0B; --accent-deep:#9FDB90; --good:#7CC96B; --warn:#E2B14A; --bad:#F0877A;
+  --btn:#27402A; --btn-ink:#CFF0C6; --btn-line:#3A5C3C;
+  --c1:#7CC96B; --c2:#6FB5E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 *,*::before,*::after{box-sizing:inherit}
@@ -56,11 +59,12 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 header.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 header.top .sub{font-size:13px;color:var(--muted);margin-top:4px}
-.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:9px 20px;font-weight:600}
-.btn:hover{filter:brightness(.93)}
+.btn{background:var(--btn);color:var(--btn-ink);border:1px solid var(--btn-line);border-radius:999px;padding:9px 20px;font-weight:600}
+.btn:hover{filter:brightness(.96)}
+.btn:disabled{opacity:.6;cursor:default}
 .btn.ghost{background:transparent;color:var(--accent-deep);border:1px solid var(--accent)}
 .btn.small{padding:4px 10px;font-size:13px}
-nav.tabs{display:flex;gap:6px;overflow-x:auto;margin:18px 0 0;border-bottom:1px solid var(--line);scrollbar-width:none}
+nav.tabs{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x;-webkit-overflow-scrolling:touch;margin:18px 0 0;border-bottom:1px solid var(--line);scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;color:var(--muted);font-weight:500;white-space:nowrap;margin-bottom:-1px}
 nav.tabs button[aria-selected="true"]{color:var(--accent-deep);border-bottom-color:var(--accent);font-weight:600}
@@ -142,6 +146,15 @@ details>summary{cursor:pointer;font-weight:600;padding:2px 0}
 .kpi .l{font-size:12.5px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .paycard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0;background:var(--surface)}
+.seg{display:inline-flex;border:1px solid var(--btn-line);border-radius:999px;overflow:hidden;margin:6px 0 10px}
+.seg button{background:transparent;border:0;padding:7px 18px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink)}
+.alerts .mk.info{background:var(--c2)}
+.aibox{background:var(--soft);border-radius:12px;padding:12px 16px;margin:8px 0}
+.aibox p{margin:0 0 8px}
+.aibox h3:first-child{margin-top:0!important}
+ul.ins{margin:4px 0 8px;padding-left:20px}
+ul.ins li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -357,7 +370,8 @@ function defaults() {
     limits: { k401: 24500, hsa: 4400, ira: 7500, roLo: 242000, roHi: 252000 },
     people: { chris: person('Chris'), sami: person('Sami') },
     checks: {}, depositMap: {}, history: {},
-    runway: { added: 0 }
+    goals: '',
+    runway: { added: 0, addedSami: 0 }
   };
 }
 function mergeDefaults(a, d) { // keep user values, fill any missing keys
@@ -369,7 +383,7 @@ function mergeDefaults(a, d) { // keep user values, fill any missing keys
 }
 
 /* ---------- state ---------- */
-const S = { snap: null, set: defaults(), tab: 'overview', month: null, db: null, mode: 'pending', exclWedding: true, openCat: null, extra: 0, strategy: 'avalanche', msg: null, busy: false, loaded: { snap: false, set: false } };
+const S = { runWho: 'chris', snap: null, set: defaults(), tab: 'overview', month: null, db: null, mode: 'pending', exclWedding: true, openCat: null, extra: 0, strategy: 'avalanche', msg: null, busy: false, loaded: { snap: false, set: false } };
 let saveTimer = null;
 
 /* ---------- persistence ---------- */
@@ -557,7 +571,7 @@ function header() {
   }
   return '<header class="top"><div><h1>Chris &amp; Sami</h1><div class="sub">' + esc(sub) + warn + '</div></div>' +
     '<button class="btn" data-a="tab" data-v="update">Update data</button></header>' +
-    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['pay', 'Pay'], ['loans', 'Loans'], ['runway', 'Runway'], ['update', 'Update']].map(t =>
+    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['pay', 'Pay'], ['loans', 'Loans'], ['runway', 'Runway'], ['insights', 'Insights'], ['update', 'Update']].map(t =>
       '<button role="tab" aria-selected="' + (S.tab === t[0]) + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav>';
 }
 function emptyView() {
@@ -652,20 +666,30 @@ function retire() {
     '<div><h2>Employer money</h2><table class="stmt"><tbody>' + Object.keys(P).map(k => '<tr><th>' + esc(P[k].label) + '</th><td class="num">' + fmt(c.per[k].employer) + '</td></tr>').join('') + '<tr class="total"><th>Per year</th><td class="num">' + fmt(c.employer) + '</td></tr></tbody></table><p class="muted" style="font-size:13px">Match, annual employer contribution and HSA seed. Sami\u2019s annual contribution arrives each Q1 and needs 1,000 hours a year.</p></div></section>';
 }
 
-function runway() {
+function runwayCalc(who) {
   const st = S.set, c = calc(), t = typeTotals(curIdx()), ns = monthlyNeeds();
   const liquid = t.cash + t.emergency + t.savings + t.brokerage + t.card;
-  const sami = st.people.sami, samiChk = c.per.sami.chk / 12, added = +st.runway.added || 0;
-  const sc = [['Needs only', ns], ['All current targets', c.planned]].map(x => { const spend = x[1] + added, gap = spend - samiChk; return { n: x[0], spend, gap, mo: gap > 0 ? liquid / gap : Infinity }; });
-  return '<h2>If Chris\u2019s paycheck stopped</h2><p class="lede">A rough check for the day Chris starts something of his own. Sami\u2019s take-home keeps covering the bills; savings and the brokerage fill any gap.</p>' +
-    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(samiChk) + '</div><div class="l">Sami\u2019s take-home per month</div></div><div class="kpi"><div class="v">' + fmt(liquid) + '</div><div class="l">liquid savings and brokerage, after card balances</div></div></div>' +
-    '<div class="tw"><table class="stmt"><thead><tr><th></th>' + sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' +
-    '<tr><th>Monthly spending</th>' + sc.map((s, i) => '<td class="num">' + fmt(s.spend - added) + '</td>').join('') + '</tr>' +
-    '<tr><th>Added costs without Chris\u2019s employer</th>' + sc.map(() => '<td class="num">' + fmt(added) + '</td>').join('') + '</tr>' +
-    '<tr><th>Sami\u2019s take-home</th>' + sc.map(() => '<td class="num">' + fmt(-samiChk) + '</td>').join('') + '</tr>' +
-    '<tr class="total"><th>Monthly gap</th>' + sc.map(s => '<td class="num ' + (s.gap > 0 ? 'bad' : 'good') + '">' + (s.gap > 0 ? fmt(s.gap) : 'Covered, ' + fmt(-s.gap) + ' spare') + '</td>').join('') + '</tr>' +
-    '<tr><th>Runway from savings</th>' + sc.map(s => '<td class="num">' + (isFinite(s.mo) ? (s.mo >= 120 ? '10+ years' : dur(Math.round(s.mo))) : 'No drawdown') + '</td>').join('') + '</tr></tbody></table></div>' +
-    '<p class="muted" style="font-size:13px">Assumes Sami\u2019s pay and deductions stay as they are, and that Chris\u2019s Roth IRA, brokerage and 401(k) saving stops. The added-cost line starts at the extra premium for putting Chris on Sami\u2019s Allina plan (' + fmt(st.runway.added) + ' a month, your estimate). Self-employment taxes and business costs aren\u2019t modeled. Change the added cost under Settings.</p>' +
+  const other = who === 'sami' ? 'chris' : 'sami';
+  const keep = c.per[other].chk / 12, added = +(who === 'sami' ? st.runway.addedSami : st.runway.added) || 0;
+  const sc = [['Needs only', ns], ['All current targets', c.planned]].map(x => { const spend = x[1] + added, gap = spend - keep; return { n: x[0], spend, gap, mo: gap > 0 ? liquid / gap : Infinity }; });
+  return { who, other, keep, added, liquid, sc };
+}
+function runway() {
+  const st = S.set, P = st.people, who = S.runWho === 'sami' ? 'sami' : 'chris', R = runwayCalc(who), RO = runwayCalc(who === 'sami' ? 'chris' : 'sami');
+  const lost = P[who].label, kept = P[R.other].label;
+  const moTxt = s => isFinite(s.mo) ? (s.mo >= 120 ? '10+ years' : dur(Math.round(s.mo))) : 'No drawdown';
+  const seg = '<div class="seg" role="group" aria-label="Whose paycheck stops">' + ['chris', 'sami'].map(k => '<button data-a="runwho" data-v="' + k + '" aria-pressed="' + (k === who) + '">' + esc(P[k].label) + '</button>').join('') + '</div>';
+  const both = [R, RO].sort((a, b) => (a.who === 'chris' ? -1 : 1)).map(r => '<tr><th>If ' + esc(P[r.who].label) + '’s paycheck stopped</th>' + r.sc.map(s => '<td class="num">' + moTxt(s) + '</td>').join('') + '</tr>').join('');
+  return '<h2>If ' + esc(lost) + '’s paycheck stopped</h2><p class="lede">A rough check for a lost job or a leap into something new. ' + esc(kept) + '’s take-home keeps covering the bills; savings and the brokerage fill any gap.</p>' + seg +
+    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(R.keep) + '</div><div class="l">' + esc(kept) + '’s take-home per month</div></div><div class="kpi"><div class="v">' + fmt(R.liquid) + '</div><div class="l">liquid savings and brokerage, after card balances</div></div></div>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th></th>' + R.sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' +
+    '<tr><th>Monthly spending</th>' + R.sc.map(s => '<td class="num">' + fmt(s.spend - R.added) + '</td>').join('') + '</tr>' +
+    '<tr><th>Added costs without ' + esc(lost) + '’s employer</th>' + R.sc.map(() => '<td class="num">' + fmt(R.added) + '</td>').join('') + '</tr>' +
+    '<tr><th>' + esc(kept) + '’s take-home</th>' + R.sc.map(() => '<td class="num">' + fmt(-R.keep) + '</td>').join('') + '</tr>' +
+    '<tr class="total"><th>Monthly gap</th>' + R.sc.map(s => '<td class="num ' + (s.gap > 0 ? 'bad' : 'good') + '">' + (s.gap > 0 ? fmt(s.gap) : 'Covered, ' + fmt(-s.gap) + ' spare') + '</td>').join('') + '</tr>' +
+    '<tr><th>Runway from savings</th>' + R.sc.map(s => '<td class="num">' + moTxt(s) + '</td>').join('') + '</tr></tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Assumes ' + esc(kept) + '’s pay and deductions stay as they are, and that ' + esc(lost) + '’s Roth IRA, brokerage and 401(k) saving stops. Added costs are your own estimate, such as replacing employer health coverage (' + fmt(R.added) + ' a month). Change them under Settings. Self-employment taxes and business costs aren’t modeled.</p>' +
+    '<section class="blk"><h3>Side by side</h3><div class="tw"><table class="stmt"><thead><tr><th>Runway from savings</th>' + R.sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' + both + '</tbody></table></div></section>' +
     '<section class="blk"><h2>Reading this</h2><p class="lede">Needs only means rent, parking, utilities, insurance, groceries, gas, loan minimums and the other needs ticked under Settings. Retirement and HSA balances are left out, since tapping them early costs penalties.</p></section>';
 }
 
@@ -720,11 +744,128 @@ function update() {
     '<details><summary>Account types</summary><p class="muted" style="font-size:13px">Decides which bucket each YNAB account lands in. New accounts are sorted by name; change one here if it\u2019s wrong.</p><div class="tw"><table class="stmt"><thead><tr><th>Account</th><th class="num">Balance</th><th class="num">Last activity</th><th class="num">Type</th></tr></thead><tbody>' + accts + '</tbody></table></div></details>' +
     '<details><summary>What counts as a need</summary><p class="muted" style="font-size:13px">Drives the cash cushion. Needs are summed from this month\u2019s targets.</p><div style="columns:2 240px">' + needList.map(c => '<label style="display:block;break-inside:avoid"><input type="checkbox" data-a="need" data-v="' + esc(c) + '" ' + (nset.has(c) ? 'checked' : '') + '> ' + esc(c) + '</label>').join('') + '</div><div class="fld" style="margin-top:12px"><label for="mt">Emergency fund target, months of needs</label><input id="mt" type="number" step="1" min="1" value="' + st.monthsTarget + '" data-a="mt"></div></details>' +
     '<details><summary>Paychecks and contribution limits</summary><p class="muted" style="font-size:13px">From your latest pay stubs. Update when pay or deferrals change.</p>' + people +
-    '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
+    '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">If Sami leaves her job</h3><div class="fld"><label for="rw2">Added monthly costs (health coverage and the like)</label><input id="rw2" type="number" step="10" value="' + (st.runway.addedSami || 0) + '" data-a="rw2"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
     '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
 }
 
 
+
+/* ---------- insights ---------- */
+const AI = { busy: false, err: '' };
+const lsRaw = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const lsRawSet = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); return true; } catch (e) { return false; } };
+const AI_MODELS = [['claude-sonnet-5-5', 'Sonnet 5.5 (faster, cheaper)'], ['claude-opus-5-5', 'Opus 5.5 (deeper)']];
+function aiSaved() { try { return JSON.parse(lsRaw('fin.insights') || 'null'); } catch (e) { return null; } }
+function magiNow() { const st = S.set, N = st.paychecks, c = calc(); let m = c.gross; Object.keys(st.people).forEach(k => { m -= (st.people[k].hsa + st.people[k].pretaxOther) * N; }); return m; }
+
+function flags() {
+  const st = S.set, sn = S.snap, out = [], add = (l, t) => out.push({ l, t });
+  if (!sn) return out;
+  const t = typeTotals(curIdx()), ns = monthlyNeeds(), age = daysBetween(sn.asOf, todayIso()), P = st.people, L = st.limits, c = calc();
+  if (age > 7) add('warn', 'YNAB data is ' + age + ' days old. Sync before relying on the numbers below.');
+  if (ns > 0) {
+    const mo = t.emergency / ns, tgt = st.monthsTarget;
+    if (mo < tgt) add('warn', 'The emergency fund covers ' + mo.toFixed(1) + ' months of needs against a ' + tgt + '-month target. The gap is ' + fmt(tgt * ns - t.emergency) + '.');
+    else add('ok', 'The emergency fund covers ' + mo.toFixed(1) + ' months of needs, above the ' + tgt + '-month target.');
+  }
+  tracker().forEach(r => {
+    const rem = remaining(P[r.k].next, st.year);
+    if (r.left < -1) add('bad', r.who + ' is on track to put ' + fmt(-r.left) + ' too much into the ' + r.acct + ' for ' + st.year + '. Excess contributions carry a 6% yearly tax until fixed.');
+    else if (r.left > 1 && r.hsa) add('warn', r.who + '’s HSA has ' + fmt(r.left) + ' of room left for ' + st.year + (rem ? ', about ' + fmt(r.left / rem) + ' more per remaining paycheck, or a one-time deposit before Dec 31' : '') + '.');
+    else if (r.left > 1 && r.ira) add('info', r.who + '’s Roth IRA has ' + fmt(r.left) + ' of room left for ' + st.year + ', open until Apr 15, ' + (st.year + 1) + '.');
+  });
+  Object.keys(P).forEach(k => { const p = P[k], d = p.gross ? p.roth401k / p.gross * 100 : 0; if (p.gross && d + 0.01 < p.matchNeeds) add('warn', p.label + ' defers ' + d.toFixed(1) + '% to the 401(k) but needs ' + p.matchNeeds + '% for the full employer match.'); });
+  const magi = magiNow();
+  if (magi > L.roHi) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', above the ' + fmt(L.roHi) + ' Roth IRA limit. Roth IRA money goes in through the backdoor.');
+  else if (magi > L.roLo) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', inside the Roth IRA phase-out range. Wait for the W-2s before choosing direct or backdoor.');
+  if (c.surplus > 100) add('info', 'About ' + fmt(c.surplus) + ' a month lands in checking without a job in YNAB. Decide where it goes: brokerage, the emergency fund, or a goal.');
+  const over = sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[curIdx()] < -1).sort((a, b) => a.v[curIdx()] - b.v[curIdx()]).slice(0, 3);
+  if (over.length) add('warn', 'Overspent this month: ' + over.map(x => x.c + ' (' + fmt(-x.v[curIdx()]) + ')').join(', ') + '. Cover it in YNAB or move money.');
+  Object.keys(P).forEach(k => { const m = payModel(k), lr = m.rows.slice().reverse().find(r => r.base && !r.partial); if (lr && P[k].gross && Math.abs(lr.base - P[k].gross) > 1) add('warn', P[k].label + '’s latest pay stub shows ' + fmt2(lr.base) + ' per paycheck but the app has ' + fmt2(P[k].gross) + '. Apply the stub on the Update tab.'); });
+  checklist().filter(x => !st.checks[x.id] && x.due && daysBetween(todayIso(), x.due) <= 60).forEach(x => add(daysBetween(todayIso(), x.due) < 0 ? 'bad' : 'warn', x.t + ' (due ' + niceDate(x.due) + ').'));
+  const st2 = stale(); if (st2.length) add('warn', st2.length + ' account(s) haven’t been reconciled recently: ' + st2.slice(0, 3).map(a => a.n).join(', ') + '.');
+  const order = { bad: 0, warn: 1, info: 2, ok: 3 };
+  return out.sort((a, b) => order[a.l] - order[b.l]);
+}
+
+function insightContext() {
+  const st = S.set, sn = S.snap, P = st.people, i = curIdx(), t = typeTotals(i), c = calc(), ns = monthlyNeeds();
+  const nwAt = j => { const tt = typeTotals(j); return Math.round(Object.keys(tt).reduce((s, k) => s + tt[k], 0)); };
+  const r1 = x => Math.round(x), people = {};
+  Object.keys(P).forEach(k => {
+    const p = P[k], m = payModel(k), last = m.rows[m.rows.length - 1];
+    people[p.label] = { grossPerPaycheck: p.gross, taxesPerPaycheck: p.taxes, roth401kPerPaycheck: p.roth401k, hsaPerPaycheck: p.hsa, toRothIraPerPaycheck: p.rothIra, toBrokeragePerPaycheck: p.brokerage, nextPayday: p.next, ytd: p.ytd || null, matchNeedsPct: p.matchNeeds, latestStubDate: last ? last.d : null, raises: m.raises.slice(-3).map(r => ({ date: r.d, from: r.from, to: r.to })) };
+  });
+  const rc = { chris: runwayCalc('chris'), sami: runwayCalc('sami') }, run = {};
+  Object.keys(rc).forEach(k => { run['if' + P[k].label + 'LosesPay'] = { monthlyTakeHomeKept: r1(rc[k].keep), addedMonthlyCosts: r1(rc[k].added), monthsOfRunwayNeedsOnly: isFinite(rc[k].sc[0].mo) ? +rc[k].sc[0].mo.toFixed(1) : 'covered', monthsOfRunwayAllTargets: isFinite(rc[k].sc[1].mo) ? +rc[k].sc[1].mo.toFixed(1) : 'covered' }; });
+  return {
+    today: todayIso(), ynabDataThrough: sn.asOf, goalsAndContext: st.goals || '',
+    balancesByType: Object.keys(t).reduce((o, k) => { o[k] = r1(t[k]); return o; }, {}), netWorth: nwAt(i),
+    netWorthHistory: sn.months.slice(-7).map((m, j, a) => ({ month: m, value: nwAt(sn.months.length - a.length + j) })),
+    emergencyFundMonthsOfNeeds: ns ? +(t.emergency / ns).toFixed(1) : null, targetMonths: st.monthsTarget, monthlyNeeds: r1(ns), monthlyPlannedSpending: r1(c.planned), monthlyLeftOver: r1(c.surplus),
+    annualGross: r1(c.gross), annualSavedThroughPayrollAndBrokerage: r1(c.savedAll), annualEmployerMoney: r1(c.employer), estimatedMAGI: r1(magiNow()), rothIraPhaseOut: [st.limits.roLo, st.limits.roHi],
+    paychecksPerYear: st.paychecks, people,
+    contributionRoom: tracker().map(r => ({ who: r.who, account: r.acct, projectedYear: r1(r.proj), limit: r.lim, roomLeft: r1(r.left) })),
+    overspentThisMonth: sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[i] < -1).map(x => ({ category: x.c, over: r1(-x.v[i]) })).slice(0, 8),
+    loans: loanList().map(l => ({ loan: l.name, balance: r1(l.bal), ratePct: l.rate, minPayment: r1(l.min) })),
+    runway: run, openChecklist: checklist().filter(x => !st.checks[x.id]).map(x => ({ task: x.t, due: x.due || null })),
+    appFlags: flags().filter(f => f.l !== 'ok').map(f => f.t)
+  };
+}
+const AI_SYSTEM = 'You are a careful, plain-spoken household finance analyst for one married couple. Use only the data provided; never invent numbers, and say when something looks stale or estimated. Be specific with dollar amounts and dates. You are not a licensed advisor, so frame suggestions as considerations. Answer in exactly three sections with these headings: "## What changed", "## Flags", "## Next moves". What changed: 2 to 4 bullets comparing against previousSnapshot if present (net worth, savings, pay, balances), otherwise note this is the first read. Flags: the things that need attention, most urgent first, each with the reason and the amount. Next moves: at most 5 ranked actions with amounts and deadlines, using the couple’s goalsAndContext. Keep it under 350 words, no preamble.';
+async function askClaude() {
+  const key = lsRaw('fin.anthropic.key');
+  if (!key) { S.msg = { err: true, t: 'Add your Anthropic API key first.' }; render(); return; }
+  AI.busy = true; AI.err = ''; render();
+  try {
+    const ctx = insightContext(), prev = (function () { try { return JSON.parse(lsRaw('fin.insights.ctx') || 'null'); } catch (e) { return null; } })();
+    if (prev) ctx.previousSnapshot = { ynabDataThrough: prev.ynabDataThrough, netWorth: prev.netWorth, balancesByType: prev.balancesByType, monthlyLeftOver: prev.monthlyLeftOver, estimatedMAGI: prev.estimatedMAGI, contributionRoom: prev.contributionRoom };
+    let r;
+    try {
+      r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: lsRaw('fin.insights.model') || AI_MODELS[0][0], max_tokens: 1600, system: AI_SYSTEM, messages: [{ role: 'user', content: 'Here is our household finance snapshot as JSON. Review it.\n\n' + JSON.stringify(ctx) }] }) });
+    } catch (e) { throw new Error('Could not reach Anthropic. Check your connection and try again.'); }
+    if (r.status === 401) throw new Error('Anthropic rejected the API key. Check it or make a new one.');
+    if (r.status === 429) throw new Error('Anthropic’s rate limit was reached. Try again in a minute.');
+    if (!r.ok) { let m = ''; try { m = (await r.json()).error.message; } catch (e) { } throw new Error('Anthropic returned an error (' + r.status + ').' + (m ? ' ' + m : '')); }
+    const j = await r.json(), text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) throw new Error('Claude returned an empty answer. Try again.');
+    lsRawSet('fin.insights', JSON.stringify({ text, at: new Date().toISOString(), asOf: S.snap.asOf, model: j.model || '' }));
+    lsRawSet('fin.insights.ctx', JSON.stringify(ctx));
+  } catch (e) { AI.err = (e && e.message) || String(e); }
+  AI.busy = false; render();
+}
+function mdLite(t) {
+  const lines = esc(t).split('\n'); let h = '', ul = false;
+  const inl = s => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  lines.forEach(l => {
+    const m = /^\s*[-*] (.*)/.exec(l);
+    if (m) { if (!ul) { h += '<ul class="ins">'; ul = true; } h += '<li>' + inl(m[1]) + '</li>'; return; }
+    if (ul) { h += '</ul>'; ul = false; }
+    if (/^##\s/.test(l)) h += '<h3 style="margin-top:16px">' + inl(l.replace(/^##\s+/, '')) + '</h3>';
+    else if (l.trim()) h += '<p>' + inl(l) + '</p>';
+  });
+  return h + (ul ? '</ul>' : '');
+}
+function insights() {
+  const st = S.set; if (!S.snap) return '<div class="empty"><h2>Nothing to read yet</h2><p class="muted">Sync from YNAB on the Update tab first.</p></div>';
+  const fl = flags(), saved = aiSaved(), key = lsRaw('fin.anthropic.key'), auto = lsRaw('fin.insights.auto') === '1', model = lsRaw('fin.insights.model') || AI_MODELS[0][0];
+  const mk = { bad: 'bad', warn: '', info: 'info', ok: 'ok' };
+  let h = '<h2>Insights</h2><p class="lede">Flags the app can compute on its own, and an optional read from Claude on the same numbers.</p>' +
+    '<section class="blk"><h3>Flags</h3><ul class="alerts">' + fl.map(f => '<li><span class="mk ' + mk[f.l] + '"></span><span>' + esc(f.t) + '</span><span></span></li>').join('') + '</ul></section>';
+  h += '<section class="blk"><h3>Claude’s read</h3>';
+  if (AI.err) h += '<div class="banner err">' + esc(AI.err) + '</div>';
+  if (saved) h += '<div class="aibox">' + mdLite(saved.text) + '<p class="muted" style="font-size:12.5px;margin-top:10px">Read on ' + esc(new Date(saved.at).toLocaleString()) + ' from data through ' + niceDate(saved.asOf) + '. AI can make mistakes; check the numbers before acting. Not financial advice.</p></div>';
+  else h += '<p class="muted">No read yet.</p>';
+  if (key) h += '<div class="tools"><button class="btn" data-a="aiask"' + (AI.busy ? ' disabled' : '') + '>' + (AI.busy ? 'Reading your numbers…' : (saved ? 'Read again' : 'Get Claude’s read')) + '</button></div>';
+  h += '<details' + (key ? '' : ' open') + '><summary>Set up Claude</summary><p class="muted" style="font-size:13px">This page can send a summary of your numbers to Claude using your own Anthropic API key. The summary has balances by type, pay figures, contribution room and category totals. It has no transactions, account names or account numbers. Your key stays in this browser and goes only to Anthropic. Use a dedicated key with a low monthly spend limit, and treat it like a password. Each read costs a few cents.</p>' +
+    '<div class="fld" style="grid-template-columns:1fr auto"><input id="aikey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + (key ? 'Key saved. Paste a new one to replace it.' : 'Anthropic API key') + '" aria-label="Anthropic API key"><button class="btn" data-a="aikeysave">Save</button></div>' +
+    (key ? '<div class="fld"><label for="aimodel">Model</label><select id="aimodel" data-a="aimodel">' + AI_MODELS.map(m => '<option value="' + m[0] + '"' + (m[0] === model ? ' selected' : '') + '>' + m[1] + '</option>').join('') + '</select></div>' +
+      '<label style="display:block;margin:8px 0"><input type="checkbox" data-a="aiauto"' + (auto ? ' checked' : '') + '> Read my numbers automatically after each YNAB sync</label><button class="btn ghost small" data-a="aikeyforget">Remove key</button>' : '') + '</details>';
+  h += '<details><summary>Or paste a summary into a Claude chat</summary><p class="muted" style="font-size:13px">No key needed. Copy this and paste it into a conversation with Claude.</p><textarea id="aictx" readonly rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:12px/1.4 ui-monospace,Menlo,monospace" aria-label="Summary to copy">' + esc('Review our household finance snapshot. Tell me what changed, what to flag, and the next moves.\n\n' + JSON.stringify(insightContext())) + '</textarea><div class="tools"><button class="btn ghost small" data-a="aicopy">Copy summary</button></div></details></section>';
+  h += '<section class="blk"><h3>Goals and context for Claude</h3><p class="muted" style="font-size:13px">Anything that should shape the advice: targets, plans, deadlines. It is included in every read.</p><textarea id="goals" data-a="goals" rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:inherit" aria-label="Goals and context">' + esc(st.goals || '') + '</textarea></section>';
+  return h;
+}
 
 /* ---------- pay history ---------- */
 function payModel(k) {
@@ -932,7 +1073,7 @@ function render() {
   let body;
   if (S.tab === 'update') body = update();
   else if (!S.snap && S.tab !== 'pay') body = emptyView();
-  else body = ({ overview, plan, retire, pay, loans, runway }[S.tab] || overview)();
+  else body = ({ overview, plan, retire, pay, loans, runway, insights }[S.tab] || overview)();
   app.innerHTML = header() + '<main>' + (S.tab !== 'update' && S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') + body + '</main>';
   wireDrop();
   if (focusId) { const el = document.getElementById(focusId); if (el && el.focus) try { el.focus(); } catch (e) { } }
@@ -1030,6 +1171,7 @@ async function ynabSync() {
     let t = 'Synced ' + snap.rows.reg.toLocaleString() + ' transactions through ' + niceDate(snap.asOf) + '.';
     if (prev) t += ' Net worth moved ' + fmt(nwOf(snap) - nwOf(prev)) + ' since the last refresh.';
     S.msg = { t };
+    if (lsRaw('fin.insights.auto') === '1' && lsRaw('fin.anthropic.key')) setTimeout(() => { askClaude(); }, 50);
   } catch (e) {
     if (e.code === 'auth') { tokSet(''); Y.budgets = null; }
     S.msg = { err: true, t: (e && e.message) || String(e) };
@@ -1056,6 +1198,11 @@ document.addEventListener('click', async ev => {
   else if (a === 'ignore') { S.set.acctType[v] = 'ignore'; saveSettings(); render(); }
   else if (a === 'reset') { S.set = defaults(); saveSettings(); S.msg = { t: 'Settings reset to defaults.' }; render(); }
   else if (a === 'stubapply') { payApply(+v); }
+  else if (a === 'runwho') { S.runWho = v; render(); }
+  else if (a === 'aiask') { await askClaude(); }
+  else if (a === 'aikeysave') { const k = (document.getElementById('aikey').value || '').trim(); if (!k) { S.msg = { err: true, t: 'Paste the API key first.' }; } else if (!lsRawSet('fin.anthropic.key', k)) S.msg = { err: true, t: 'This browser would not save the key.' }; else S.msg = { t: 'Key saved in this browser.' }; render(); }
+  else if (a === 'aikeyforget') { lsRawSet('fin.anthropic.key', ''); lsRawSet('fin.insights.auto', ''); S.msg = { t: 'API key removed from this browser.' }; render(); }
+  else if (a === 'aicopy') { const ta = document.getElementById('aictx'); try { await navigator.clipboard.writeText(ta.value); S.msg = { t: 'Summary copied.' }; } catch (e) { ta.focus(); ta.select(); S.msg = { t: 'Select and copy the text above.' }; } render(); }
   else if (a === 'histadd') {
     const who = document.getElementById('histwho').value, recs = window.PayStubs.parseHistoryText(document.getElementById('histtext').value);
     if (!recs.length) { S.msg = { err: true, t: 'No checks found. Each needs a date, a gross amount and a take-home amount.' }; render(); return; }
@@ -1091,6 +1238,10 @@ document.addEventListener('change', ev => {
   else if (a === 'rate') { st.loanRates[v] = Math.max(0, +el.value || 0); saveSettings(); render(); }
   else if (a === 'atype') { st.acctType[v] = el.value; saveSettings(); render(); }
   else if (a === 'need') { const s = needsSet(); el.checked ? s.add(v) : s.delete(v); st.needs = Array.from(s); saveSettings(); render(); }
+  else if (a === 'rw2') { st.runway.addedSami = Math.max(0, +el.value || 0); saveSettings(); render(); }
+  else if (a === 'goals') { st.goals = el.value; saveSettings(); }
+  else if (a === 'aimodel') { lsRawSet('fin.insights.model', el.value); render(); }
+  else if (a === 'aiauto') { lsRawSet('fin.insights.auto', el.checked ? '1' : ''); render(); }
   else if (a === 'rw') { st.runway.added = Math.max(0, +el.value || 0); saveSettings(); render(); }
   else if (a === 'mt') { st.monthsTarget = Math.max(1, +el.value || 3); saveSettings(); render(); }
   else if (a === 'pc') { st.paychecks = Math.max(1, +el.value || 26); saveSettings(); render(); }
