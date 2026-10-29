@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D4E89">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Chris & Sami · Money check-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="jszip.min.js"></script>
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#16202E; --muted:#566274; --line:#D3DAE3; --soft:#E4E9EF;
+  --accent:#1D4E89; --accent-ink:#FFFFFF; --good:#1B7A62; --warn:#A8690F; --bad:#B3372B;
+  --c1:#1D4E89; --c2:#2A9D8F; --c3:#C9822B; --c4:#8A5CA8; --c5:#B3372B; --c6:#6B7A8F;
+  --display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F151D; --surface:#171F2A; --ink:#E7ECF2; --muted:#9AA7B8; --line:#2B3748; --soft:#212C3A;
+    --accent:#6EA8F2; --accent-ink:#0F151D; --good:#4CC3A1; --warn:#E2B14A; --bad:#F0877A;
+    --c1:#6EA8F2; --c2:#4CC3A1; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A1B5;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F151D; --surface:#171F2A; --ink:#E7ECF2; --muted:#9AA7B8; --line:#2B3748; --soft:#212C3A;
+  --accent:#6EA8F2; --accent-ink:#0F151D; --good:#4CC3A1; --warn:#E2B14A; --bad:#F0877A;
+  --c1:#6EA8F2; --c2:#4CC3A1; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A1B5;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit-text-size-adjust:100%}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 18px 64px}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;letter-spacing:-.01em}
+h1{font-size:26px;line-height:1.1}
+h2{font-size:21px;line-height:1.2;margin:0 0 4px}
+h3{font-size:16px;margin:0 0 6px}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+header.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+header.top .sub{font-size:13px;color:var(--muted);margin-top:4px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 14px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:4px 10px;font-size:13px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;margin:18px 0 0;border-bottom:1px solid var(--line);scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;color:var(--muted);font-weight:500;white-space:nowrap;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+main>h2:first-child{margin-top:22px}
+section.blk{padding:26px 0 8px;border-bottom:1px solid var(--line)}
+section.blk:last-child{border-bottom:0}
+.verdict{font-family:var(--display);font-weight:700;font-size:clamp(22px,4.4vw,34px);line-height:1.15;letter-spacing:-.015em;margin:26px 0 6px;max-width:30ch}
+.lede{color:var(--muted);max-width:62ch;margin-bottom:14px}
+.track{position:relative;height:10px;background:var(--soft);border-radius:5px}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}
+.track .fill.watch{background:var(--warn)} .track .fill.over{background:var(--bad)}
+.track .tick{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);opacity:.75}
+.pace{display:grid;gap:12px;margin:14px 0 6px;max-width:640px}
+.pace .lab{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.legend{font-size:12.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.stmt{width:100%;border-collapse:collapse;margin:8px 0 4px}
+.stmt td,.stmt th{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:baseline}
+.stmt th{text-align:left;font-weight:400}
+.stmt td.num{padding-left:14px}
+.stmt tr.total td,.stmt tr.total th{font-weight:600;border-bottom:2px solid var(--ink)}
+.stmt tr.sub th{padding-left:14px;color:var(--muted);font-size:13.5px}
+.stmt tr.sub td{color:var(--muted);font-size:13.5px}
+.stmt thead th{font-size:12.5px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--ink)}
+.stmt thead th.num{text-align:right}
+.tw{overflow-x:auto}
+.alerts{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.alerts li{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:start}
+.alerts .mk{width:10px;height:10px;margin-top:6px;border-radius:2px;background:var(--warn)}
+.alerts .mk.bad{background:var(--bad)} .alerts .mk.ok{background:var(--good)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+@media(max-width:760px){.two{grid-template-columns:1fr;gap:0}}
+.bad{color:var(--bad)} .good{color:var(--good)} .warn{color:var(--warn)}
+.tbar{display:flex;align-items:center;gap:10px;margin:8px 0}
+.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0 6px}
+select,input[type=text],input[type=number],input[type=date]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+input[type=number]{width:110px;text-align:right}
+.grp{margin:22px 0 0}
+.grp>h3{display:flex;justify-content:space-between;align-items:baseline}
+.row{display:grid;grid-template-columns:minmax(130px,1.5fr) 78px 78px 84px minmax(120px,2fr);gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.row.head{cursor:default;font-size:12.5px;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--ink)}
+.row:not(.head):hover{background:var(--soft)}
+.row .nm{overflow-wrap:anywhere}
+.row .st{font-size:12.5px;margin-top:7px}
+.txs{background:var(--soft);padding:8px 12px;margin:0 0 4px;font-size:13.5px}
+.txs div{display:grid;grid-template-columns:70px 1fr auto;gap:10px;padding:3px 0}
+@media(max-width:640px){
+  .row{grid-template-columns:1fr auto;grid-template-areas:"nm left" "bar bar" "meta meta";gap:6px 12px}
+  .row.head{display:none}
+  .row .nm{grid-area:nm} .row .c-left{grid-area:left} .row .c-bar{grid-area:bar}
+  .row .c-t,.row .c-s{display:none}
+  .row .meta{grid-area:meta;display:block!important}
+}
+.row .meta{display:none;font-size:12.5px;color:var(--muted)}
+.split{display:flex;height:16px;border-radius:8px;overflow:hidden;margin:14px 0 6px;background:var(--soft)}
+.split span{display:block;height:100%}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font:11px var(--body)}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:28px 18px;text-align:center;background:var(--surface)}
+.drop.hot{border-color:var(--accent);background:var(--soft)}
+.banner{padding:10px 12px;border-left:4px solid var(--good);background:var(--surface);margin:12px 0}
+.banner.err{border-left-color:var(--bad)}
+.steps{margin:6px 0 0 18px;padding:0}
+.steps li{margin-bottom:4px}
+details{border-top:1px solid var(--line);padding:10px 0}
+details>summary{cursor:pointer;font-weight:600;padding:2px 0}
+.fld{display:grid;grid-template-columns:minmax(150px,1fr) auto;gap:8px 14px;align-items:center;margin:6px 0}
+.chk{display:grid;grid-template-columns:22px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start}
+.chk input{margin-top:4px;width:17px;height:17px}
+.chk.done .t{text-decoration:line-through;color:var(--muted)}
+.chk .note{font-size:13.5px;color:var(--muted)}
+.chk .due{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.mini{height:8px;background:var(--soft);border-radius:4px;position:relative;margin-top:6px;max-width:360px}
+.mini>span{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}
+.empty{padding:40px 0;max-width:56ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 28px;margin:12px 0}
+.kpi .v{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em}
+.kpi .l{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app" aria-live="polite"><p class="muted" style="margin-top:40px">Loading…</p></div>
+<script>
+/* YNAB export parser: turns Plan.csv + Register.csv into one compact snapshot. */
+const FinParse = (function () {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const rows = []; let row = [], f = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ',') { row.push(f); f = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(f); f = ''; if (row.length > 1 || row[0] !== '') rows.push(row); row = [];
+      } else f += ch;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    if (!rows.length) return [];
+    const head = rows[0].map(h => h.trim());
+    return rows.slice(1).map(r => { const o = {}; head.forEach((h, i) => o[h] = r[i] === undefined ? '' : r[i]); return o; });
+  }
+
+  function money(s) {
+    if (s == null) return 0;
+    s = String(s).trim(); if (!s) return 0;
+    const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\$/.test(s);
+    const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? 0 : (neg ? -n : n);
+  }
+  const r2 = x => Math.round(x * 100) / 100;
+
+  function monthKey(label) { // "Oct 2026" -> "2026-10"
+    const m = String(label).trim().match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{4})$/);
+    if (!m) return null;
+    const i = MONTHS.indexOf(m[1].charAt(0).toUpperCase() + m[1].slice(1, 3).toLowerCase());
+    return i < 0 ? null : m[2] + '-' + String(i + 1).padStart(2, '0');
+  }
+  function isoDate(s) { // MM/DD/YYYY or YYYY-MM-DD -> YYYY-MM-DD
+    s = String(s).trim(); let m;
+    if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+    if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+    return null;
+  }
+  const clean = s => String(s == null ? '' : s).trim();
+
+  function build(planText, regText, opts) {
+    opts = opts || {};
+    const asOf = opts.asOf; // YYYY-MM-DD, required
+    const plan = parseCSV(planText), reg = parseCSV(regText);
+    if (!plan.length || !('Assigned' in plan[0]) || !('Month' in plan[0])) throw new Error('The Plan file is missing the Month / Assigned columns. Use the "Plan.csv" file from the YNAB export.');
+    if (!reg.length || !('Outflow' in reg[0]) || !('Account' in reg[0])) throw new Error('The Register file is missing the Account / Outflow columns. Use the "Register.csv" file from the YNAB export.');
+
+    // ---- months + categories
+    const mset = new Set();
+    plan.forEach(r => { const k = monthKey(r.Month); if (k) mset.add(k); });
+    const months = Array.from(mset).sort();
+    const mi = {}; months.forEach((m, i) => mi[m] = i);
+    const cats = {}, order = [];
+    plan.forEach(r => {
+      const k = monthKey(r.Month); if (!k) return;
+      const g = clean(r['Category Group']), c = clean(r.Category), key = g + '|' + c;
+      if (!cats[key]) { cats[key] = { g, c, a: months.map(() => 0), x: months.map(() => 0), v: months.map(() => 0) }; order.push(key); }
+      const o = cats[key], i = mi[k];
+      o.a[i] = r2(money(r.Assigned)); o.x[i] = r2(money(r.Activity)); o.v[i] = r2(money(r.Available));
+    });
+
+    // ---- accounts: month-end balances from the register
+    const accts = {}, tx = [];
+    const first = months[0], lastM = months[months.length - 1];
+    const asOfM = asOf.slice(0, 7);
+    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 120);
+    const cutIso = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+    reg.forEach(r => {
+      const d = isoDate(r.Date); if (!d || d > asOf) return;
+      const name = clean(r.Account); if (!name) return;
+      const net = money(r.Inflow) - money(r.Outflow);
+      const a = accts[name] || (accts[name] = { n: name, per: {}, last: d, firstD: d, bal: 0 });
+      let mk = d.slice(0, 7); if (mk < first) mk = first;
+      a.per[mk] = (a.per[mk] || 0) + net; a.bal += net;
+      if (d > a.last) a.last = d; if (d < a.firstD) a.firstD = d;
+      if (d >= cutIso) {
+        const c = clean(r.Category), g = clean(r['Category Group']);
+        tx.push({ d, a: name, p: clean(r.Payee).slice(0, 48), g, c, m: r2(net) });
+      }
+    });
+    const accounts = Object.values(accts).map(a => {
+      let run = 0; const s = months.map(m => { run += (a.per[m] || 0); return r2(run); });
+      return { n: a.n, bal: r2(a.bal), last: a.last, first: a.firstD, s };
+    }).sort((x, y) => x.n.localeCompare(y.n));
+    tx.sort((x, y) => y.d.localeCompare(x.d));
+
+    return {
+      v: 1, asOf, importedAt: opts.importedAt || new Date().toISOString(), source: opts.source || '',
+      months, cats: order.map(k => cats[k]), accts: accounts, tx,
+      rows: { plan: plan.length, reg: reg.length }
+    };
+  }
+
+  /* YNAB API budget (GET /budgets/{id}) -> the same snapshot build() produces. */
+  function fromYnabApi(b, opts) {
+    opts = opts || {};
+    const asOf = opts.asOf, asOfM = asOf.slice(0, 7);
+    const u = x => r2((+x || 0) / 1000);
+    const grp = {}; (b.category_groups || []).forEach(g => { grp[g.id] = g.name; });
+    const catById = {};
+    (b.categories || []).forEach(c => {
+      let g = clean(c.category_group_name || grp[c.category_group_id]), n = clean(c.name);
+      if (g === 'Internal Master Category') { g = 'Inflow'; n = n.replace(/^Inflow:\s*/, ''); }
+      catById[c.id] = { g, c: n };
+    });
+    const payee = {}; (b.payees || []).forEach(p => { payee[p.id] = p.name; });
+    const acctName = {}; (b.accounts || []).forEach(a => { if (!a.deleted) acctName[a.id] = a.name; });
+
+    // months + categories
+    const mlist = (b.months || []).filter(m => !m.deleted && m.month && m.month.slice(0, 7) <= asOfM)
+      .sort((x, y) => x.month.localeCompare(y.month));
+    const months = mlist.map(m => m.month.slice(0, 7));
+    if (!months.length) throw new Error('YNAB returned no months for this budget.');
+    const cats = {}, order = [];
+    mlist.forEach((m, i) => (m.categories || []).forEach(c => {
+      if (c.deleted) return;
+      const known = catById[c.id] || {};
+      const g = clean(c.category_group_name || known.g || grp[c.category_group_id]), n = clean(c.name);
+      if (g === 'Internal Master Category' || g === 'Inflow' || /^Inflow: Ready to Assign$/.test(n) || n === 'Uncategorized') return;
+      const key = g + '|' + n;
+      if (!cats[key]) { cats[key] = { g, c: n, a: months.map(() => 0), x: months.map(() => 0), v: months.map(() => 0), hid: !!c.hidden }; order.push(key); }
+      const o = cats[key]; o.a[i] = u(c.budgeted); o.x[i] = u(c.activity); o.v[i] = u(c.balance);
+    }));
+    const catList = order.map(k => cats[k]).filter(o => !(o.hid && !o.a.some(Boolean) && !o.x.some(Boolean) && !o.v.some(Boolean)));
+    catList.forEach(o => { delete o.hid; });
+
+    // accounts: month-end balances from transactions, last 120 days of detail
+    const first = months[0];
+    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 120);
+    const cutIso = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+    const subs = {}; (b.subtransactions || []).forEach(s => { if (!s.deleted) (subs[s.transaction_id] = subs[s.transaction_id] || []).push(s); });
+    const accts = {}, tx = []; let count = 0;
+    (b.transactions || []).forEach(t => {
+      if (t.deleted) return;
+      const d = isoDate(t.date); if (!d || d > asOf) return;
+      const name = acctName[t.account_id]; if (!name) return;
+      count++;
+      const net = u(t.amount);
+      const a = accts[name] || (accts[name] = { n: name, per: {}, last: d, firstD: d, bal: 0 });
+      let mk = d.slice(0, 7); if (mk < first) mk = first;
+      a.per[mk] = (a.per[mk] || 0) + net; a.bal += net;
+      if (d > a.last) a.last = d; if (d < a.firstD) a.firstD = d;
+      if (d >= cutIso) {
+        const pn = clean(payee[t.payee_id]);
+        const parts = subs[t.id];
+        if (parts && parts.length) parts.forEach(s => {
+          const cc = catById[s.category_id] || { g: '', c: '' };
+          tx.push({ d, a: name, p: clean(payee[s.payee_id] || pn).slice(0, 48), g: cc.g, c: cc.c, m: u(s.amount) });
+        });
+        else { const cc = catById[t.category_id] || { g: '', c: '' }; tx.push({ d, a: name, p: pn.slice(0, 48), g: cc.g, c: cc.c, m: net }); }
+      }
+    });
+    const accounts = Object.values(accts).map(a => {
+      let run = 0; const s = months.map(m => { run += (a.per[m] || 0); return r2(run); });
+      return { n: a.n, bal: r2(a.bal), last: a.last, first: a.firstD, s };
+    }).sort((x, y) => x.n.localeCompare(y.n));
+    tx.sort((x, y) => y.d.localeCompare(x.d));
+    return {
+      v: 1, asOf, importedAt: opts.importedAt || new Date().toISOString(), source: opts.source || '',
+      months, cats: catList, accts: accounts, tx,
+      rows: { plan: catList.length * months.length, reg: count }
+    };
+  }
+  return { parseCSV, money, monthKey, isoDate, build, fromYnabApi };
+})();
+window.FinParse = FinParse;
+
+</script>
+<script>
+(function () {
+'use strict';
+const $ = (s, el) => (el || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (n, d) => { d = d || 0; const v = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); return (n < -0.004 ? '\u2212' : '') + '$' + v; };
+const fmt2 = n => fmt(n, 2);
+const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLabel = k => MN[+k.slice(5) - 1] + ' ' + k.slice(0, 4);
+const monthShort = k => MN[+k.slice(5) - 1] + " '" + k.slice(2, 4);
+const niceDate = d => { const p = d.split('-'); return MN[+p[1] - 1] + ' ' + (+p[2]) + ', ' + p[0]; };
+const todayIso = () => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
+const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* ---------- defaults ---------- */
+const DEFAULT_NEEDS = ['Rent', 'Mortgage', 'Utilities', 'Internet', 'Insurance', 'Groceries', 'Gas & Fuel', 'Transportation', 'Health', 'Student Loans', 'Debt Payments'];
+const CHECKS = [
+  { id: 'ef', t: 'Build the emergency fund to the months-of-needs target', n: 'The Plan tab shows the gap.' },
+  { id: 'hsa', t: 'Top off HSAs before year-end', n: 'The Retirement tab shows how much room each one has.', due: '2026-12-31' },
+  { id: 'roth', t: 'Confirm this year’s Roth IRA total, then top up', n: 'Contribution deadline is April 15 of next year.', due: '2027-04-15' },
+  { id: 'magi', t: 'January: compute MAGI from the W-2s, then choose direct or backdoor Roth', due: '2027-01-31' },
+  { id: 'rates', t: 'Verify student loan rates with your servicer', n: 'Rates are entered on the Loans tab.' }
+];
+function checklist() { return (S.set && Array.isArray(S.set.checklist) && S.set.checklist.length) ? S.set.checklist : CHECKS; }
+function defaults() {
+  const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0 });
+  return {
+    v: 1, acctType: {}, needs: null, monthsTarget: 3,
+    loanRates: {},
+    paychecks: 26, year: 2026,
+    limits: { k401: 24500, hsa: 4400, ira: 7500, roLo: 242000, roHi: 252000 },
+    people: { chris: person('Chris'), sami: person('Sami') },
+    checks: {},
+    runway: { added: 0 }
+  };
+}
+function mergeDefaults(a, d) { // keep user values, fill any missing keys
+  if (typeof d !== 'object' || d === null || Array.isArray(d)) return a === undefined ? d : a;
+  const o = {}; a = (a && typeof a === 'object') ? a : {};
+  Object.keys(d).forEach(k => { o[k] = (k in a) ? mergeDefaults(a[k], d[k]) : d[k]; });
+  Object.keys(a).forEach(k => { if (!(k in o)) o[k] = a[k]; });
+  return o;
+}
+
+/* ---------- state ---------- */
+const S = { snap: null, set: defaults(), tab: 'overview', month: null, db: null, mode: 'pending', exclWedding: true, openCat: null, extra: 0, strategy: 'avalanche', msg: null, busy: false, loaded: { snap: false, set: false } };
+let saveTimer = null;
+
+/* ---------- persistence ---------- */
+function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+async function saveSnap() {
+  if (S.mode === 'db') await S.db.doc('fin/snapshot').set(S.snap); else lsSet('fin.snapshot', S.snap);
+}
+function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { if (S.mode === 'db') await S.db.doc('fin/settings').set(S.set); else lsSet('fin.settings', S.set); }
+    catch (e) { S.msg = { err: true, t: 'Could not save settings: ' + (e && e.message || e) }; render(); }
+  }, 500);
+}
+function applyDoc(kind, data) {
+  if (kind === 'snap') S.snap = (data && data.months) ? data : null;
+  else S.set = mergeDefaults(data ? clone(data) : {}, defaults());
+  S.loaded[kind] = true;
+  if (S.snap && (!S.month || S.snap.months.indexOf(S.month) < 0)) S.month = latestMonth();
+  render();
+}
+async function boot() {
+  S.mode = 'local';
+  applyDoc('set', lsGet('fin.settings')); applyDoc('snap', lsGet('fin.snapshot'));
+}
+
+/* ---------- model helpers ---------- */
+function latestMonth() { return S.snap.months[S.snap.months.length - 1]; }
+function curIdx() { return S.snap.months.length - 1; }
+function acctType(n) {
+  const o = S.set.acctType[n]; if (o) return o;
+  if (/direct loan/i.test(n)) return 'loan';
+  if (/roth ira|401k|retirement|employer match/i.test(n)) return 'retire';
+  if (/hsa/i.test(n)) return 'hsa';
+  if (/investment account|brokerage/i.test(n)) return 'brokerage';
+  if (/ally/i.test(n)) return 'emergency';
+  if (/money market/i.test(n)) return 'savings';
+  if (/card|visa|mastercard|amex|discover|redcard|bilt/i.test(n)) return 'card';
+  if (/checking|savings|cash|venmo/i.test(n)) return 'cash';
+  return 'other';
+}
+const TYPES = { cash: 'Checking & cash', emergency: 'Emergency fund', savings: 'Savings goals', brokerage: 'Brokerage', retire: 'Retirement', hsa: 'HSA', card: 'Credit cards', loan: 'Student loans', other: 'Other', ignore: 'Ignore' };
+function typeTotals(i) {
+  const t = {}; Object.keys(TYPES).forEach(k => t[k] = 0);
+  S.snap.accts.forEach(a => { const ty = acctType(a.n); if (ty !== 'ignore') t[ty] += (i == null ? a.bal : a.s[i]); });
+  return t;
+}
+function isCardCat(c) { return !!(S.snap && S.snap.accts.some(a => a.n === c && acctType(a.n) === 'card')); }
+function kindOf(g, c) {
+  if (c === 'Wedding' || isCardCat(c)) return 'ignore';
+  if (/^(Credit Card Payments|Money Market|Miscellaneous|Hidden|Inflow)/.test(g)) return 'ignore';
+  if (/^PA School Loans/.test(g)) return 'bill';
+  if (/Fixed Yearly/.test(g)) return 'sink';
+  if (/^Bills & Utilities/.test(g)) return 'bill';
+  return 'flex';
+}
+function needsSet() { return new Set(S.set.needs || DEFAULT_NEEDS); }
+function monthlyNeeds() {
+  const i = curIdx(), ns = needsSet(); let t = 0;
+  S.snap.cats.forEach(c => { if (ns.has(c.c) && c.a[i] > 0) t += c.a[i]; });
+  return t;
+}
+function paceFor(month) {
+  const asOf = S.snap.asOf;
+  if (month !== asOf.slice(0, 7)) return 1;
+  const y = +asOf.slice(0, 4), m = +asOf.slice(5, 7), d = +asOf.slice(8, 10);
+  return d / new Date(y, m, 0).getDate();
+}
+function monthRows(month) {
+  const i = S.snap.months.indexOf(month), rows = [];
+  S.snap.cats.forEach(c => {
+    const kind = kindOf(c.g, c.c); if (kind === 'ignore') return;
+    const a = c.a[i], x = c.x[i], v = c.v[i];
+    if (a === 0 && x === 0) return;
+    const spent = -x, used = a > 0 ? spent / a : (spent > 0.005 ? 9 : 0);
+    rows.push({ key: c.g + '|' + c.c, g: c.g, c: c.c, kind, a, spent, v, used, left: a - spent });
+  });
+  return rows;
+}
+function level(r, pace) {
+  if (r.a <= 0 && r.spent > 0.005) return { k: 'over', t: 'No target' };
+  if (r.spent > r.a + 0.005) return { k: 'over', t: 'Over by ' + fmt2(r.spent - r.a) };
+  if (r.a > 0 && r.used >= 0.995) return { k: 'watch', t: 'Used up' };
+  if (r.a > 0 && (r.used > pace + 0.2 || r.used >= 0.9)) return { k: 'watch', t: 'Ahead of pace' };
+  return { k: 'ok', t: 'On pace' };
+}
+function stale() {
+  const out = [];
+  S.snap.accts.forEach(a => {
+    const ty = acctType(a.n);
+    if (!['retire', 'hsa', 'brokerage'].includes(ty)) return;
+    const age = daysBetween(a.last, S.snap.asOf);
+    if (age > 30) out.push({ n: a.n, last: a.last, age, bal: a.bal });
+  });
+  return out;
+}
+
+/* ---------- loans ---------- */
+function loanList() {
+  const i = curIdx();
+  return S.snap.accts.filter(a => acctType(a.n) === 'loan' && a.bal < -0.005).map(a => {
+    const id = (a.n.match(/^(\d-\d\d)/) || [])[1] || a.n;
+    const cat = S.snap.cats.find(c => c.c === a.n);
+    return { name: a.n, id, bal: -a.bal, rate: +(S.set.loanRates[id] != null ? S.set.loanRates[id] : 0), min: cat ? Math.max(0, cat.a[i]) : 0 };
+  });
+}
+function simulate(loans, extra, strategy, roll) {
+  const L = loans.map(l => ({ name: l.name, rate: l.rate, min: l.min, b: l.bal, paid: null, int: 0 }));
+  const allMins = loans.reduce((s, l) => s + l.min, 0);
+  let m = 0, tot = 0; const MAX = 720;
+  while (L.some(l => l.b > 0.005) && m < MAX) {
+    m++;
+    L.forEach(l => { if (l.b > 0) { const i = l.b * l.rate / 1200; l.b += i; l.int += i; tot += i; } });
+    let paidMins = 0;
+    L.forEach(l => { if (l.b > 0) { const p = Math.min(l.min, l.b); l.b -= p; paidMins += p; } });
+    let pool = roll ? Math.max(0, allMins + extra - paidMins) : extra;
+    const order = L.filter(l => l.b > 0.005).sort(strategy === 'avalanche' ? (a, b) => b.rate - a.rate : (a, b) => a.b - b.b);
+    for (const l of order) { if (pool <= 0.005) break; const p = Math.min(pool, l.b); l.b -= p; pool -= p; }
+    L.forEach(l => { if (l.b <= 0.005 && l.paid === null) { l.b = 0; l.paid = m; } });
+  }
+  return { months: m, capped: m >= MAX, total: tot, loans: L };
+}
+function addMonths(iso, n) { const y = +iso.slice(0, 4), m = +iso.slice(5, 7) - 1 + n; return MN[((m % 12) + 12) % 12] + ' ' + (y + Math.floor(m / 12)); }
+function dur(n) { const y = Math.floor(n / 12), m = n % 12; return (y ? y + ' yr ' : '') + (m ? m + ' mo' : (y ? '' : '0 mo')); }
+
+/* ---------- charts ---------- */
+function lineChart(vals, labels) {
+  const W = 640, H = 220, L = 52, R = 14, T = 14, B = 26, n = vals.length;
+  let mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (mn === mx) { mn -= 1; mx += 1; }
+  const pad = (mx - mn) * 0.08; mn -= pad; mx += pad;
+  const x = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)), y = v => T + (H - T - B) * (1 - (v - mn) / (mx - mn));
+  let d = '', area = '';
+  vals.forEach((v, i) => { d += (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
+  area = d + 'L' + x(n - 1).toFixed(1) + ' ' + (H - B) + 'L' + x(0).toFixed(1) + ' ' + (H - B) + 'Z';
+  let g = '';
+  for (let k = 0; k <= 3; k++) { const v = mn + (mx - mn) * k / 3; g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)"/><text x="' + (L - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end">' + fmt(v / 1000) + 'k</text>'; }
+  let xl = ''; const step = Math.max(1, Math.round(n / 6));
+  labels.forEach((lb, i) => { if (i % step === 0 || i === n - 1) xl += '<text x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + (i === n - 1 ? 'end' : 'middle') + '">' + esc(lb) + '</text>'; });
+  const dots = vals.map((v, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="' + (i === n - 1 ? 4 : 8) + '" fill="' + (i === n - 1 ? 'var(--accent)' : 'transparent') + '"><title>' + esc(labels[i]) + ': ' + fmt(v) + '</title></circle>').join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Net worth over time">' + g + '<path d="' + area + '" fill="var(--accent)" opacity=".12"/><path d="' + d + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>' + dots + xl + '</svg>';
+}
+
+/* ---------- views ---------- */
+const pct = x => (x < -0.004 ? '\u2212' : '') + Math.round(Math.abs(x) * 100) + '%';
+function remaining(next, year) { // paydays left in the year, biweekly from `next`
+  if (!next) return 0; let n = 0, d = new Date(next + 'T00:00:00'); const end = new Date(year + '-12-31T00:00:00');
+  while (d <= end) { n++; d.setDate(d.getDate() + 14); } return n;
+}
+function calc() {
+  const st = S.set, P = st.people, N = st.paychecks;
+  let gross = 0, taxes = 0, ded = 0, employer = 0, toChecking = 0; const sv = { roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0 }, per = {};
+  Object.keys(P).forEach(k => {
+    const p = P[k], g = p.gross * N, t = p.taxes * N, d = (p.pretaxOther + p.otherPost) * N;
+    const emp = g * p.matchPct / 100 + g * p.annualEmpPct / 100 + (+p.hsaSeed || 0);
+    const chk = (p.gross - p.taxes - p.pretaxOther - p.otherPost - p.roth401k - p.hsa - p.rothIra - p.brokerage) * N;
+    per[k] = { gross: g, taxes: t, ded: d, employer: emp, chk };
+    gross += g; taxes += t; ded += d; employer += emp; toChecking += chk;
+    sv.roth401k += p.roth401k * N; sv.hsa += p.hsa * N; sv.rothIra += p.rothIra * N; sv.brokerage += p.brokerage * N;
+  });
+  const savedAll = sv.roth401k + sv.hsa + sv.rothIra + sv.brokerage;
+  let planned = 0; monthRows(latestMonth()).forEach(r => { if (r.a > 0) planned += r.a; });
+  const surplus = toChecking / 12 - planned;
+  return { gross, taxes, ded, employer, toChecking, sv, savedAll, per, planned, surplus };
+}
+function tracker() {
+  const st = S.set, P = st.people, L = st.limits, N = st.paychecks, rows = [];
+  Object.keys(P).forEach(k => {
+    const p = P[k], rem = remaining(p.next, st.year);
+    const proj = (perPay, ytd) => (ytd !== '' && ytd != null && !isNaN(+ytd)) ? +ytd + perPay * rem : perPay * N;
+    rows.push({ k, who: p.label, acct: 'Roth 401(k)', per: p.roth401k, proj: proj(p.roth401k), lim: L.k401 });
+    rows.push({ k, who: p.label, acct: 'HSA' + (p.hsaSeed ? ' (with employer seed)' : ''), per: p.hsa, proj: proj(p.hsa) + (+p.hsaSeed || 0), lim: L.hsa, hsa: 1 });
+    rows.push({ k, who: p.label, acct: 'Roth IRA', per: p.rothIra, proj: proj(p.rothIra, p.ytdRothIra) + (+p.rothIraLump || 0), lim: L.ira, ira: 1 });
+  });
+  rows.forEach(r => r.left = r.lim - r.proj);
+  return rows;
+}
+function header() {
+  const sn = S.snap; let sub = 'No data yet. Open the Update tab to add your YNAB export.', warn = '';
+  if (sn) {
+    const age = daysBetween(sn.asOf, todayIso());
+    sub = 'YNAB data through ' + niceDate(sn.asOf) + (S.mode === 'local' ? ' · saved in this browser only' : '');
+    if (age >= 8) warn = ' <span class="warn">· ' + age + ' days old, time to refresh</span>';
+  }
+  return '<header class="top"><div><h1>Chris &amp; Sami</h1><div class="sub">' + esc(sub) + warn + '</div></div>' +
+    '<button class="btn" data-a="tab" data-v="update">Update data</button></header>' +
+    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['loans', 'Loans'], ['runway', 'Runway'], ['update', 'Update']].map(t =>
+      '<button role="tab" aria-selected="' + (S.tab === t[0]) + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav>';
+}
+function emptyView() {
+  if (!S.loaded.snap && S.mode === 'pending') return '<p class="muted" style="margin-top:30px">Loading…</p>';
+  return '<div class="empty"><h2>Nothing here yet</h2><p class="muted">Export your budget from YNAB and drop the file on the Update tab. Balances come from that one file; pay stub numbers live under Settings.</p><button class="btn" data-a="tab" data-v="update">Add the YNAB export</button></div>';
+}
+function housekeeping() {
+  const sn = S.snap, al = [], t = typeTotals(curIdx());
+  const ef = t.emergency, efCat = sn.cats.find(c => c.c === 'Emergency Fund'), trCat = sn.cats.find(c => c.c === 'Transfers');
+  if (efCat && Math.abs(ef - efCat.v[curIdx()]) > 1) {
+    const tr = trCat ? trCat.v[curIdx()] : 0;
+    al.push('The Emergency Fund category (' + fmt2(efCat.v[curIdx()]) + ') doesn\u2019t match the emergency account (' + fmt2(ef) + ').' + (tr > 0 ? ' The Transfers category holds ' + fmt2(tr) + ': assign it to the Emergency Fund in YNAB.' : ''));
+  }
+  stale().forEach(a => al.push('<b>' + esc(a.n) + '</b> hasn\u2019t been updated since ' + niceDate(a.last) + '. Reconcile it in YNAB, or ignore it on the Update tab.'));
+  return al;
+}
+
+function overview() {
+  const sn = S.snap, c = calc(), t = typeTotals(curIdx()), ns = monthlyNeeds();
+  const nw = Object.keys(t).reduce((s, k) => s + t[k], 0), ef = t.emergency, months = ns > 0 ? ef / ns : 0;
+  const rate = c.gross > 0 ? (c.savedAll + c.employer) / c.gross : 0, full = c.gross > 0 ? (c.savedAll + c.employer + Math.max(0, c.surplus) * 12) / c.gross : 0;
+  const verdict = 'We save about ' + pct(rate) + ' of gross income' + (c.surplus > 0 ? ', and about ' + pct(full) + ' if every target holds.' : '.');
+  const next = checklist().filter(x => !S.set.checks[x.id]).slice(0, 3), hk = housekeeping();
+  const mths = sn.months, series = mths.map((m, i) => { const tt = typeTotals(i); return Object.keys(tt).reduce((s, k) => s + tt[k], 0); });
+  const from = Math.max(0, mths.length - 25), prev = series.length > 1 ? series[series.length - 2] : nw;
+  const newAcc = sn.accts.filter(a => acctType(a.n) !== 'ignore' && a.first.slice(0, 7) === latestMonth() && a.bal !== 0 && (a.s.length < 2 || a.s[a.s.length - 2] === 0));
+  const order = ['cash', 'emergency', 'savings', 'brokerage', 'retire', 'hsa'];
+  return '<div class="verdict">' + esc(verdict) + '</div>' +
+    '<p class="lede">That is ' + fmt(c.savedAll + c.employer) + ' a year through payroll and employer contributions' + (c.surplus > 0 ? ', plus about ' + fmt(c.surplus) + ' a month left after the YNAB targets.' : '. Planned spending now uses all of the monthly take-home.') + '</p>' +
+    '<div class="kpis"><div class="kpi"><div class="v">' + pct(rate) + '</div><div class="l">of gross saved, with employer money</div></div><div class="kpi"><div class="v">' + fmt(c.surplus) + '</div><div class="l">left each month after targets</div></div><div class="kpi"><div class="v">' + months.toFixed(1) + ' mo</div><div class="l">emergency fund covers needs</div></div><div class="kpi"><div class="v">' + fmt(nw) + '</div><div class="l">net worth</div></div></div>' +
+    '<section class="blk"><h2>Next up</h2>' + (next.length ? next.map(x => '<div class="chk"><span></span><span><span class="t">' + esc(x.t) + '</span>' + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + '</span></div>').join('') + '<p style="margin-top:10px"><button class="btn ghost small" data-a="tab" data-v="plan">Open the full plan</button></p>' : '<p class="good">Every priority is ticked off.</p>') + '</section>' +
+    (hk.length ? '<section class="blk"><h2>Housekeeping</h2><ul class="alerts">' + hk.map(h => '<li><span class="mk"></span><span>' + h + '</span><span></span></li>').join('') + '</ul></section>' : '') +
+    '<section class="blk two"><div><h2>Where we stand</h2><table class="stmt"><tbody>' +
+    order.map(k => t[k] || sn.accts.some(a => acctType(a.n) === k) ? '<tr><th>' + TYPES[k] + '</th><td class="num">' + fmt(t[k]) + '</td></tr>' : '').join('') +
+    '<tr><th>Credit cards owed</th><td class="num">' + fmt(t.card) + '</td></tr><tr><th>Student loans</th><td class="num">' + fmt(t.loan) + '</td></tr><tr class="total"><th>Net worth</th><td class="num">' + fmt(nw) + '</td></tr></tbody></table>' +
+    '<p class="muted" style="font-size:13px">' + (nw - prev >= 0 ? 'Up ' : 'Down ') + fmt(Math.abs(nw - prev)) + ' since last month-end. Investment accounts only move when reconciled in YNAB.' + (newAcc.length ? ' That includes the opening balances of ' + newAcc.length + ' accounts added to YNAB this month.' : '') + '</p></div>' +
+    '<div><h2>Net worth, last ' + (mths.length - from) + ' months</h2>' + lineChart(series.slice(from), mths.slice(from).map(monthShort)) + '</div></section>' +
+    '<section class="blk"><h2>What lives elsewhere</h2><p class="lede">YNAB already covers spending reports, category targets and its own net worth chart, so they\u2019re not repeated here. For investment returns, fees and a retirement projection, a free Empower account or your Fidelity login does the job: YNAB only sees balances, not holdings or performance.</p></section>';
+}
+
+function plan() {
+  const st = S.set, c = calc(), t = typeTotals(curIdx()), ns = monthlyNeeds(), N = st.paychecks;
+  const m = x => x / 12, g = c.gross || 1;
+  const rows = [
+    ['Gross pay', c.gross, 'head'], ['Taxes', -c.taxes], ['Insurance and parking', -c.ded],
+    ['Roth 401(k)', -c.sv.roth401k, 'sub'], ['HSA', -c.sv.hsa, 'sub'], ['Roth IRA', -c.sv.rothIra, 'sub'], ['Brokerage', -c.sv.brokerage, 'sub'],
+    ['Deposited to checking', c.toChecking, 'tot'], ['Planned spending (YNAB targets)', -c.planned * 12], ['Left over', c.surplus * 12, 'tot']
+  ];
+  const seg = [[c.taxes, 'var(--c6)', 'Taxes'], [c.ded, 'var(--c4)', 'Insurance'], [c.savedAll, 'var(--c1)', 'Saved through payroll'], [c.planned * 12, 'var(--c3)', 'Planned spending'], [Math.max(0, c.surplus * 12), 'var(--c2)', 'Left over']];
+  const tr = tracker(), find = (k, a) => tr.find(r => r.k === k && r.acct.indexOf(a) === 0);
+  const efGoal = st.monthsTarget * ns, efGap = Math.max(0, efGoal - t.emergency);
+  const items = [
+    { t: 'Emergency fund to ' + st.monthsTarget + ' months of needs', need: efGap, due: '' },
+    { t: 'Sami\u2019s 2026 Roth IRA', need: Math.max(0, find('sami', 'Roth IRA').left), due: '2027-04-15' },
+    { t: 'Chris\u2019s 2026 Roth IRA top-up', need: Math.max(0, find('chris', 'Roth IRA').left), due: '2027-04-15' },
+    { t: 'Sami\u2019s HSA top-off', need: Math.max(0, find('sami', 'HSA').left), due: '2026-12-31' },
+    { t: 'Chris\u2019s HSA top-off', need: Math.max(0, find('chris', 'HSA').left), due: '2026-12-31' }
+  ].filter(x => x.need >= 1);
+  let pool = t.savings; const pool0 = pool;
+  items.forEach(x => { x.cov = Math.min(pool, x.need); pool -= x.cov; x.short = x.need - x.cov; });
+  const short = items.reduce((s, x) => s + x.short, 0);
+  const done = id => !!st.checks[id];
+  return '<h2>Where each dollar goes</h2><p class="lede">From the latest pay stubs, over a full year. Spending is this month\u2019s YNAB targets.</p>' +
+    '<div class="split" role="img" aria-label="Share of gross income by use">' + seg.map(s => '<span title="' + s[2] + '" style="width:' + (s[0] / g * 100).toFixed(2) + '%;background:' + s[1] + '"></span>').join('') + '</div>' +
+    '<div class="legend">' + seg.map(s => '<span><i style="background:' + s[1] + '"></i>' + s[2] + ' ' + pct(s[0] / g) + '</span>').join('') + '</div>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th></th><th class="num">Per month</th><th class="num">Per year</th><th class="num">Of gross</th></tr></thead><tbody>' +
+    rows.map(r => '<tr class="' + (r[2] === 'tot' ? 'total' : r[2] === 'sub' ? 'sub' : '') + '"><th>' + r[0] + '</th><td class="num">' + fmt(m(r[1])) + '</td><td class="num">' + fmt(r[1]) + '</td><td class="num">' + pct(r[1] / g) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Left over is cash that lands in checking and isn\u2019t assigned to a target. It\u2019s the part YNAB can\u2019t see until you assign it. If it looks too generous, check that the targets cover everything Sami pays for too.</p>' +
+    '<section class="blk"><h2>Putting cash to work</h2><p class="lede">Priorities in order, paid from the Secondary Money Market (' + fmt(pool0) + ' today).</p><div class="tw"><table class="stmt"><thead><tr><th>Priority</th><th class="num">Needed</th><th class="num">From goals fund</th><th class="num">Still to find</th><th class="num">By</th></tr></thead><tbody>' +
+    items.map(x => '<tr><th>' + esc(x.t) + '</th><td class="num">' + fmt(x.need) + '</td><td class="num">' + fmt(x.cov) + '</td><td class="num ' + (x.short > 0 ? 'bad' : '') + '">' + (x.short > 0 ? fmt(x.short) : '\u2014') + '</td><td class="num">' + (x.due ? niceDate(x.due) : 'soon') + '</td></tr>').join('') +
+    '<tr class="total"><th>Left in the goals fund after these</th><td></td><td class="num">' + fmt(pool) + '</td><td class="num">' + (short > 0 ? fmt(short) : '') + '</td><td></td></tr></tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">' + (short > 0 ? 'The shortfall can come from the monthly leftover (' + fmt(c.surplus) + '). ' : '') + 'Whatever remains can go to the house or scow fund, extra loan payments, or the brokerage. Roth IRA room assumes the paycheck deposits continue; confirm the 2026 total at Fidelity.</p></section>' +
+    '<section class="blk"><h2>Priorities</h2><p class="lede">Our ranked next steps. Tick them off as you go.</p>' +
+    checklist().map(x => '<label class="chk' + (done(x.id) ? ' done' : '') + '"><input type="checkbox" data-a="check" data-v="' + x.id + '" ' + (done(x.id) ? 'checked' : '') + '><span><span class="t">' + esc(x.t) + '</span>' + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + '</span></label>').join('') + '</section>';
+}
+
+function retire() {
+  const st = S.set, P = st.people, L = st.limits, N = st.paychecks, c = calc(), tr = tracker();
+  let magi = c.gross; Object.keys(P).forEach(k => { magi -= (P[k].hsa + P[k].pretaxOther) * N; });
+  const lo = L.roLo, hi = L.roHi;
+  const msg = magi < lo ? 'Under the limit: direct Roth IRA contributions work.' : magi > hi ? 'Over the limit: use the backdoor Roth.' : 'Inside the phase-out range: wait for the W-2s, then decide direct or backdoor.';
+  const warns = []; Object.keys(P).forEach(k => { const p = P[k], d = p.roth401k / p.gross * 100; if (d + 0.01 < p.matchNeeds) warns.push(p.label + ' defers ' + d.toFixed(1) + '% but needs ' + p.matchNeeds + '% for the full match.'); });
+  const pos = Math.max(0, Math.min(1, (magi - (lo - 20000)) / ((hi + 20000) - (lo - 20000))));
+  return '<h2>' + st.year + ' contribution room</h2><p class="lede">Projected for the full year if every paycheck matches the latest stub. Payroll deductions never show up in YNAB, so these come from the pay stub numbers under Settings.</p>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th>Account</th><th class="num">Per paycheck</th><th class="num">Projected</th><th class="num">Limit</th><th class="num">Room left</th></tr></thead><tbody>' +
+    tr.map(x => '<tr><th>' + esc(x.who) + ' · ' + esc(x.acct) + '</th><td class="num">' + fmt2(x.per) + '</td><td class="num">' + fmt(x.proj) + '</td><td class="num">' + fmt(x.lim) + '</td><td class="num ' + (x.left < -1 ? 'bad' : x.left < 1 ? 'good' : '') + '">' + (x.left < -1 ? 'Over by ' + fmt(-x.left) : fmt(Math.max(0, x.left))) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Enter what has really gone into a Roth IRA so far, or lump sums made outside payroll, under Settings on the Update tab.</p>' +
+    (warns.length ? '<ul class="alerts">' + warns.map(w => '<li><span class="mk bad"></span><span>' + esc(w) + '</span><span></span></li>').join('') + '</ul>' : '<ul class="alerts"><li><span class="mk ok"></span><span>Both of you earn the full employer match.</span><span></span></li></ul>') +
+    '<section class="blk two"><div><h2>Roth IRA income check</h2><div class="kpis"><div class="kpi"><div class="v">' + fmt(magi) + '</div><div class="l">estimated MAGI, ' + st.year + '</div></div></div>' +
+    '<div class="track" style="margin:14px 0 6px"><div class="fill" style="width:' + (pos * 100).toFixed(1) + '%;background:' + (magi < lo ? 'var(--good)' : magi > hi ? 'var(--bad)' : 'var(--warn)') + '"></div></div><div class="legend"><span>' + fmt(lo - 20000) + '</span><span>phase-out ' + fmt(lo) + ' to ' + fmt(hi) + '</span><span>' + fmt(hi + 20000) + '</span></div>' +
+    '<p style="margin-top:12px">' + esc(msg) + '</p><p class="muted" style="font-size:13px">Married filing jointly. Uses current pay for the whole year, so real 2026 income is probably lower after mid-year changes. Interest and investment gains add to it.</p></div>' +
+    '<div><h2>Employer money</h2><table class="stmt"><tbody>' + Object.keys(P).map(k => '<tr><th>' + esc(P[k].label) + '</th><td class="num">' + fmt(c.per[k].employer) + '</td></tr>').join('') + '<tr class="total"><th>Per year</th><td class="num">' + fmt(c.employer) + '</td></tr></tbody></table><p class="muted" style="font-size:13px">Match, annual employer contribution and HSA seed. Sami\u2019s annual contribution arrives each Q1 and needs 1,000 hours a year.</p></div></section>';
+}
+
+function runway() {
+  const st = S.set, c = calc(), t = typeTotals(curIdx()), ns = monthlyNeeds();
+  const liquid = t.cash + t.emergency + t.savings + t.brokerage + t.card;
+  const sami = st.people.sami, samiChk = c.per.sami.chk / 12, added = +st.runway.added || 0;
+  const sc = [['Needs only', ns], ['All current targets', c.planned]].map(x => { const spend = x[1] + added, gap = spend - samiChk; return { n: x[0], spend, gap, mo: gap > 0 ? liquid / gap : Infinity }; });
+  return '<h2>If Chris\u2019s paycheck stopped</h2><p class="lede">A rough check for the day Chris starts something of his own. Sami\u2019s take-home keeps covering the bills; savings and the brokerage fill any gap.</p>' +
+    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(samiChk) + '</div><div class="l">Sami\u2019s take-home per month</div></div><div class="kpi"><div class="v">' + fmt(liquid) + '</div><div class="l">liquid savings and brokerage, after card balances</div></div></div>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th></th>' + sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' +
+    '<tr><th>Monthly spending</th>' + sc.map((s, i) => '<td class="num">' + fmt(s.spend - added) + '</td>').join('') + '</tr>' +
+    '<tr><th>Added costs without Chris\u2019s employer</th>' + sc.map(() => '<td class="num">' + fmt(added) + '</td>').join('') + '</tr>' +
+    '<tr><th>Sami\u2019s take-home</th>' + sc.map(() => '<td class="num">' + fmt(-samiChk) + '</td>').join('') + '</tr>' +
+    '<tr class="total"><th>Monthly gap</th>' + sc.map(s => '<td class="num ' + (s.gap > 0 ? 'bad' : 'good') + '">' + (s.gap > 0 ? fmt(s.gap) : 'Covered, ' + fmt(-s.gap) + ' spare') + '</td>').join('') + '</tr>' +
+    '<tr><th>Runway from savings</th>' + sc.map(s => '<td class="num">' + (isFinite(s.mo) ? (s.mo >= 120 ? '10+ years' : dur(Math.round(s.mo))) : 'No drawdown') + '</td>').join('') + '</tr></tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Assumes Sami\u2019s pay and deductions stay as they are, and that Chris\u2019s Roth IRA, brokerage and 401(k) saving stops. The added-cost line starts at the extra premium for putting Chris on Sami\u2019s Allina plan (' + fmt(st.runway.added) + ' a month, your estimate). Self-employment taxes and business costs aren\u2019t modeled. Change the added cost under Settings.</p>' +
+    '<section class="blk"><h2>Reading this</h2><p class="lede">Needs only means rent, parking, utilities, insurance, groceries, gas, loan minimums and the other needs ticked under Settings. Retirement and HSA balances are left out, since tapping them early costs penalties.</p></section>';
+}
+
+/* ---------- loans ---------- */
+function loans() {
+  const L = loanList(); if (!L.length) return '<div class="empty"><h2>No loans found</h2><p class="muted">Loan accounts are picked up from YNAB accounts typed as Student loans.</p></div>';
+  const bal = L.reduce((s, l) => s + l.bal, 0), mins = L.reduce((s, l) => s + l.min, 0), wr = L.reduce((s, l) => s + l.bal * l.rate, 0) / bal, yi = L.reduce((s, l) => s + l.bal * l.rate / 100, 0);
+  const base = simulate(L, 0, S.strategy, false), plan = simulate(L, S.extra, S.strategy, true);
+  const asOf = S.snap.asOf;
+  const lastPaid = plan.loans.slice().sort((a, b) => (a.paid || 9999) - (b.paid || 9999));
+  const baseP = x => x.capped ? 'Never at this payment' : addMonths(asOf, x.months);
+  return '<h2>Student loans</h2><p class="lede">Balances come from your YNAB loan accounts and minimums from this month\u2019s category targets. Rates are entered here, since YNAB\u2019s export doesn\u2019t include them.</p>' +
+    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(bal) + '</div><div class="l">total owed</div></div><div class="kpi"><div class="v">' + wr.toFixed(2) + '%</div><div class="l">average rate</div></div><div class="kpi"><div class="v">' + fmt(yi) + '</div><div class="l">interest per year</div></div><div class="kpi"><div class="v">' + fmt2(mins) + '</div><div class="l">minimums per month</div></div></div>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th>Loan</th><th class="num">Balance</th><th class="num">Rate %</th><th class="num">Minimum</th><th class="num">Paid off</th></tr></thead><tbody>' +
+    L.map(l => { const r = plan.loans.find(x => x.name === l.name); return '<tr><th>' + esc(l.name) + '</th><td class="num">' + fmt2(l.bal) + '</td><td class="num"><input type="number" step="0.01" min="0" value="' + l.rate + '" data-a="rate" data-v="' + esc(l.id) + '" aria-label="Rate for ' + esc(l.name) + '"></td><td class="num">' + fmt2(l.min) + '</td><td class="num">' + (r && r.paid ? addMonths(asOf, r.paid) : '\u2014') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+    '<section class="blk"><h2>What extra payments do</h2><div class="tools"><label>Extra per month <input type="number" min="0" step="50" value="' + S.extra + '" data-a="extra"></label><label>Order <select data-a="strategy"><option value="avalanche"' + (S.strategy === 'avalanche' ? ' selected' : '') + '>Highest rate first</option><option value="snowball"' + (S.strategy === 'snowball' ? ' selected' : '') + '>Smallest balance first</option></select></label></div>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th></th><th class="num">Debt-free</th><th class="num">Time</th><th class="num">Interest paid</th></tr></thead><tbody>' +
+    '<tr><th>Minimums only</th><td class="num">' + baseP(base) + '</td><td class="num">' + dur(base.months) + '</td><td class="num">' + fmt(base.total) + '</td></tr>' +
+    '<tr><th>' + (S.extra > 0 ? 'With ' + fmt(S.extra) + ' extra, freed minimums rolled forward' : 'Same total payment, freed minimums rolled forward') + '</th><td class="num">' + baseP(plan) + '</td><td class="num">' + dur(plan.months) + '</td><td class="num">' + fmt(plan.total) + '</td></tr>' +
+    '<tr class="total"><th>Interest saved</th><td></td><td class="num">' + dur(Math.max(0, base.months - plan.months)) + ' sooner</td><td class="num good">' + fmt(Math.max(0, base.total - plan.total)) + '</td></tr></tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Compare the loan rate with what the same dollars earn elsewhere. A tax-free Roth account has so far been the better home for spare cash than loans under about 6%.</p></section>';
+}
+
+/* ---------- update ---------- */
+function update() {
+  const sn = S.snap, st = S.set;
+  let accts = '';
+  if (sn) accts = sn.accts.map(a => '<tr><th>' + esc(a.n) + '</th><td class="num">' + fmt2(a.bal) + '</td><td class="num muted">' + a.last.slice(0, 10) + '</td><td class="num"><select data-a="atype" data-v="' + esc(a.n) + '" aria-label="Type for ' + esc(a.n) + '">' + Object.keys(TYPES).map(k => '<option value="' + k + '"' + (acctType(a.n) === k ? ' selected' : '') + '>' + TYPES[k] + '</option>').join('') + '</select></td></tr>').join('');
+  const nset = needsSet();
+  const needList = sn ? Array.from(new Set(sn.cats.filter(c => kindOf(c.g, c.c) !== 'ignore').map(c => c.c))) : [];
+  const stl = sn ? stale() : [];
+  const pf = (who, k, lab, step) => '<div class="fld"><label for="p-' + who + k + '">' + lab + '</label><input id="p-' + who + k + '" type="number" step="' + (step || '0.01') + '" value="' + (st.people[who][k] === '' ? '' : st.people[who][k]) + '" data-a="pay" data-who="' + who + '" data-k="' + k + '"></div>';
+  const people = Object.keys(st.people).map(w => '<h3 style="margin-top:14px">' + esc(st.people[w].label) + '</h3>' + [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax per paycheck'], ['otherPost', 'Other post-tax deductions (parking) per paycheck'], ['roth401k', 'Roth 401(k) per paycheck'], ['hsa', 'HSA per paycheck'], ['rothIra', 'Roth IRA per paycheck'], ['brokerage', 'Brokerage per paycheck'], ['pretaxOther', 'Other pre-tax (insurance) per paycheck'], ['matchPct', 'Employer match, % of pay'], ['matchNeeds', 'Your deferral needed for full match, %'], ['annualEmpPct', 'Annual employer contribution, % of pay'], ['hsaSeed', 'Employer HSA seed per year', '1'], ['rothIraLump', 'Roth IRA contributed outside payroll', '1'], ['ytdRothIra', 'Roth IRA contributed so far via payroll (optional)', '1']].map(f => pf(w, f[0], f[1], f[2])).join('') + '<div class="fld"><label for="n-' + w + '">Next payday</label><input id="n-' + w + '" type="date" value="' + st.people[w].next + '" data-a="pay" data-who="' + w + '" data-k="next"></div>').join('');
+  return (S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') +
+    (function () {
+      const tok = tokGet(), bid = tokBudget();
+      if (!tok) return '<h2>Refresh the numbers</h2><p class="lede">Connect YNAB once, then refresh with one tap.</p>' +
+        '<div class="fld" style="grid-template-columns:1fr auto"><input id="ynab-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="YNAB personal access token" aria-label="YNAB personal access token"><button class="btn" data-a="ynabsave">' + (Y.loading ? 'Connecting…' : 'Connect') + '</button></div>' +
+        '<ol class="steps"><li>In YNAB on the web, open Account Settings, then Developer Settings.</li><li>Choose <b>New Token</b>, enter your password, and copy the token.</li><li>Paste it above. It is saved in this browser only and is sent only to YNAB.</li></ol>' +
+        '<p class="muted" style="font-size:13px">A YNAB token can read and change your whole budget, so treat it like a password. You can revoke it any time in the same settings page.</p>';
+      return '<h2>Refresh the numbers</h2><p class="lede">Pulls your latest budget straight from YNAB. About ten seconds.</p>' +
+        '<div class="tools">' + (Y.budgets ? '<label for="ynab-b" class="muted">Budget</label><select id="ynab-b" data-a="ynabbudget">' + Y.budgets.map(b => '<option value="' + esc(b.id) + '"' + (b.id === bid ? ' selected' : '') + '>' + esc(b.name) + '</option>').join('') + '</select>' : '<span class="muted">' + (Y.loading ? 'Loading budgets…' : 'Could not load budgets.') + '</span>') +
+        '<button class="btn" data-a="ynabsync"' + (S.busy || !bid ? ' disabled' : '') + '>' + (S.busy ? 'Syncing…' : 'Sync now') + '</button><button class="btn ghost small" data-a="ynabforget">Disconnect</button></div>';
+    })() +
+    '<details><summary>Or import a YNAB export file</summary><div class="drop" id="drop" style="margin-top:10px"><p style="font-weight:600;margin-bottom:6px">' + (S.busy ? 'Reading your export…' : 'Drop the YNAB export here') + '</p><p class="muted" style="margin-bottom:12px">The .zip, or the Plan and Register .csv files together.</p><input type="file" id="file" accept=".zip,.csv" multiple style="max-width:100%"></div>' +
+    '<ol class="steps"><li>On a computer, open app.ynab.com and click your budget name, top left.</li><li>Choose <b>Export Budget Data</b>. A zip downloads.</li><li>Drop that zip above.</li></ol></details>' +
+    '<p class="muted" style="font-size:13px;margin-top:10px">Your numbers stay in this browser. Nothing is sent anywhere except to YNAB when you sync.</p>' +
+    (sn ? '<section class="blk"><h2>Last import</h2><p>Data through <b>' + niceDate(sn.asOf) + '</b>. Imported ' + esc(new Date(sn.importedAt).toLocaleString()) + (sn.source ? ' from ' + esc(sn.source) : '') + '. ' + sn.rows.reg.toLocaleString() + ' transactions, ' + sn.months.length + ' months.</p>' +
+      (stl.length ? '<h3>Accounts that need a balance update in YNAB</h3><ul class="alerts">' + stl.map(a => '<li><span class="mk"></span><span><b>' + esc(a.n) + '</b>, last activity ' + niceDate(a.last) + ' (' + fmt2(a.bal) + ')</span><span><button class="btn ghost small" data-a="ignore" data-v="' + esc(a.n) + '">Ignore</button></span></li>').join('') + '</ul>' : '<p class="good">Every investment account has been updated in the last 30 days.</p>') + '</section>' : '') +
+    '<section class="blk"><h2>Settings</h2>' +
+    '<details><summary>Account types</summary><p class="muted" style="font-size:13px">Decides which bucket each YNAB account lands in. New accounts are sorted by name; change one here if it\u2019s wrong.</p><div class="tw"><table class="stmt"><thead><tr><th>Account</th><th class="num">Balance</th><th class="num">Last activity</th><th class="num">Type</th></tr></thead><tbody>' + accts + '</tbody></table></div></details>' +
+    '<details><summary>What counts as a need</summary><p class="muted" style="font-size:13px">Drives the cash cushion. Needs are summed from this month\u2019s targets.</p><div style="columns:2 240px">' + needList.map(c => '<label style="display:block;break-inside:avoid"><input type="checkbox" data-a="need" data-v="' + esc(c) + '" ' + (nset.has(c) ? 'checked' : '') + '> ' + esc(c) + '</label>').join('') + '</div><div class="fld" style="margin-top:12px"><label for="mt">Emergency fund target, months of needs</label><input id="mt" type="number" step="1" min="1" value="' + st.monthsTarget + '" data-a="mt"></div></details>' +
+    '<details><summary>Paychecks and contribution limits</summary><p class="muted" style="font-size:13px">From your latest pay stubs. Update when pay or deferrals change.</p>' + people +
+    '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
+    '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
+}
+
+/* ---------- render ---------- */
+function render() {
+  const app = $('#app'); if (!app) return;
+  const focusId = document.activeElement && document.activeElement.id;
+  let body;
+  if (S.tab === 'update') body = update();
+  else if (!S.snap) body = emptyView();
+  else body = ({ overview, plan, retire, loans, runway }[S.tab] || overview)();
+  app.innerHTML = header() + '<main>' + (S.tab !== 'update' && S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') + body + '</main>';
+  wireDrop();
+  if (focusId) { const el = document.getElementById(focusId); if (el && el.focus) try { el.focus(); } catch (e) { } }
+}
+
+/* ---------- import ---------- */
+function wireDrop() {
+  const d = $('#drop'), f = $('#file'); if (!d) return;
+  ['dragenter', 'dragover'].forEach(e => d.addEventListener(e, ev => { ev.preventDefault(); d.classList.add('hot'); }));
+  ['dragleave', 'drop'].forEach(e => d.addEventListener(e, ev => { ev.preventDefault(); d.classList.remove('hot'); }));
+  d.addEventListener('drop', ev => { if (ev.dataTransfer && ev.dataTransfer.files.length) importFiles(Array.from(ev.dataTransfer.files)); });
+  f.addEventListener('change', () => { if (f.files.length) importFiles(Array.from(f.files)); });
+}
+async function importFiles(files) {
+  S.busy = true; S.msg = null; render();
+  try {
+    let plan = null, reg = null, src = '';
+    const take = (txt, name) => {
+      const head = txt.slice(0, 400);
+      if (/Assigned/.test(head) && /Month/.test(head)) { plan = txt; src = src || name; }
+      else if (/Outflow/.test(head) && /Account/.test(head)) { reg = txt; src = src || name; }
+    };
+    for (const f of files) {
+      if (/\.zip$/i.test(f.name)) {
+        if (!window.JSZip) throw new Error('The zip reader didn\u2019t load. Unzip the file and drop the two .csv files instead.');
+        const z = await window.JSZip.loadAsync(f);
+        for (const nm of Object.keys(z.files)) if (/\.csv$/i.test(nm)) take(await z.files[nm].async('string'), nm);
+      } else if (/\.csv$/i.test(f.name)) take(await f.text(), f.name);
+    }
+    if (!plan || !reg) throw new Error('I need both the Plan and Register files. ' + (plan ? 'The Register file is missing.' : reg ? 'The Plan file is missing.' : 'Neither file looked like a YNAB export.'));
+    const prev = S.snap;
+    const snap = window.FinParse.build(plan, reg, { asOf: todayIso(), source: src.replace(/\s*-\s*(Plan|Register)\.csv$/i, '').replace(/^.*\//, '') });
+    const nwOf = sn => sn.accts.reduce((s, a) => acctType(a.n) === 'ignore' ? s : s + a.bal, 0);
+    S.snap = snap; S.month = latestMonth();
+    await saveSnap();
+    let t = 'Imported ' + snap.rows.reg.toLocaleString() + ' transactions through ' + niceDate(snap.asOf) + '.';
+    if (prev) t += ' Net worth moved ' + fmt(nwOf(snap) - nwOf(prev)) + ' since the last import.';
+    S.msg = { t };
+  } catch (e) { S.msg = { err: true, t: (e && e.message) || String(e) }; }
+  S.busy = false; render();
+}
+
+
+/* ---------- YNAB sync ---------- */
+const YNAB = 'https://api.ynab.com/v1';
+const Y = { budgets: null, loading: false };
+function tokGet() { try { return localStorage.getItem('fin.ynab.token') || ''; } catch (e) { return ''; } }
+function tokSet(v) { try { if (v) localStorage.setItem('fin.ynab.token', v); else localStorage.removeItem('fin.ynab.token'); return true; } catch (e) { return false; } }
+function tokBudget() { try { return localStorage.getItem('fin.ynab.budget') || ''; } catch (e) { return ''; } }
+function tokBudgetSet(v) { try { if (v) localStorage.setItem('fin.ynab.budget', v); else localStorage.removeItem('fin.ynab.budget'); } catch (e) { } }
+async function ynabGet(path, token) {
+  let r;
+  try { r = await fetch(YNAB + path, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } }); }
+  catch (e) { const err = new Error('Could not reach YNAB. Check your connection and try again.'); err.code = 'net'; throw err; }
+  if (r.status === 401) { const err = new Error('YNAB rejected the token. Make a new one in YNAB under Account Settings, Developer Settings.'); err.code = 'auth'; throw err; }
+  if (r.status === 429) { const err = new Error('YNAB’s hourly request limit was reached. Try again in a while.'); err.code = 'rate'; throw err; }
+  if (!r.ok) { const err = new Error('YNAB returned an error (' + r.status + ').'); err.code = 'http'; throw err; }
+  return (await r.json()).data;
+}
+async function ynabEnsure() {
+  const tok = tokGet();
+  if (!tok || Y.budgets || Y.loading) return;
+  Y.loading = true; render();
+  try {
+    const d = await ynabGet('/budgets', tok);
+    Y.budgets = (d.budgets || []).filter(b => !b.deleted).map(b => ({ id: b.id, name: b.name }));
+    const cur = tokBudget();
+    if (!Y.budgets.some(b => b.id === cur)) {
+      const pick = (d.default_budget && Y.budgets.find(b => b.id === d.default_budget.id)) || Y.budgets[0];
+      tokBudgetSet(pick ? pick.id : '');
+    }
+  } catch (e) {
+    if (e.code === 'auth') tokSet('');
+    S.msg = { err: true, t: e.message };
+  }
+  Y.loading = false; render();
+}
+async function ynabConnect() {
+  const el = document.getElementById('ynab-token'); const v = el ? el.value.trim() : '';
+  if (!v) { S.msg = { err: true, t: 'Paste the token first.' }; render(); return; }
+  if (!tokSet(v)) { S.msg = { err: true, t: 'This browser would not save the token, so sync cannot be used here.' }; render(); return; }
+  S.msg = null; Y.budgets = null; await ynabEnsure();
+}
+async function ynabSync() {
+  const tok = tokGet(), id = tokBudget();
+  S.busy = true; S.msg = null; render();
+  try {
+    if (!tok || !id) throw new Error('Connect YNAB and choose a budget first.');
+    const d = await ynabGet('/budgets/' + encodeURIComponent(id), tok);
+    const prev = S.snap;
+    const snap = window.FinParse.fromYnabApi(d.budget, { asOf: todayIso(), source: 'YNAB sync, ' + d.budget.name });
+    const nwOf = sn => sn.accts.reduce((s, a) => acctType(a.n) === 'ignore' ? s : s + a.bal, 0);
+    S.snap = snap; S.month = latestMonth();
+    await saveSnap();
+    let t = 'Synced ' + snap.rows.reg.toLocaleString() + ' transactions through ' + niceDate(snap.asOf) + '.';
+    if (prev) t += ' Net worth moved ' + fmt(nwOf(snap) - nwOf(prev)) + ' since the last refresh.';
+    S.msg = { t };
+  } catch (e) {
+    if (e.code === 'auth') { tokSet(''); Y.budgets = null; }
+    S.msg = { err: true, t: (e && e.message) || String(e) };
+  }
+  S.busy = false; render();
+}
+async function restoreFile(f) {
+  if (!f) return;
+  try {
+    const o = JSON.parse(await f.text());
+    if (!o || typeof o !== 'object' || (!o.settings && !o.snapshot)) throw new Error('That file has no settings or data in it.');
+    if (o.settings) { S.set = mergeDefaults(clone(o.settings), defaults()); lsSet('fin.settings', S.set); }
+    if (o.snapshot && o.snapshot.months) { S.snap = o.snapshot; await saveSnap(); S.month = latestMonth(); }
+    S.msg = { t: 'Restored ' + [o.settings ? 'settings' : '', o.snapshot && o.snapshot.months ? 'data' : ''].filter(Boolean).join(' and ') + ' from ' + f.name + '.' };
+  } catch (e) { S.msg = { err: true, t: 'Could not read that file. ' + ((e && e.message) || '') }; }
+  render();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-a]'); if (!el) return;
+  const a = el.dataset.a, v = el.dataset.v;
+  if (a === 'tab') { S.tab = v; S.msg = (v === 'update') ? S.msg : null; render(); window.scrollTo(0, 0); if (v === 'update') ynabEnsure(); }
+  else if (a === 'ignore') { S.set.acctType[v] = 'ignore'; saveSettings(); render(); }
+  else if (a === 'reset') { S.set = defaults(); saveSettings(); S.msg = { t: 'Settings reset to defaults.' }; render(); }
+  else if (a === 'ynabsave') { await ynabConnect(); }
+  else if (a === 'ynabsync') { await ynabSync(); }
+  else if (a === 'ynabforget') { tokSet(''); tokBudgetSet(''); Y.budgets = null; S.msg = { t: 'Disconnected. The token was removed from this browser.' }; render(); }
+  else if (a === 'backup') {
+    try {
+      const blob = new Blob([JSON.stringify({ snapshot: S.snap, settings: S.set }, null, 1)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob), link = document.createElement('a');
+      link.href = url; link.download = 'money-checkin-backup-' + todayIso() + '.json';
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { S.msg = { err: true, t: 'Could not save the backup.' }; render(); }
+  }
+});
+document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('.row[data-a="cat"]')) { ev.preventDefault(); ev.target.click(); } });
+document.addEventListener('change', ev => {
+  const el = ev.target; if (!el.dataset || !el.dataset.a) return;
+  const a = el.dataset.a, v = el.dataset.v, st = S.set;
+  if (a === 'restore') { restoreFile(el.files && el.files[0]); }
+  else if (a === 'ynabbudget') { tokBudgetSet(el.value); render(); }
+  else if (a === 'month') { S.month = el.value; S.openCat = null; render(); }
+  else if (a === 'wed') { S.exclWedding = el.checked; render(); }
+  else if (a === 'check') { st.checks[v] = el.checked; saveSettings(); render(); }
+  else if (a === 'extra') { S.extra = Math.max(0, +el.value || 0); render(); }
+  else if (a === 'strategy') { S.strategy = el.value; render(); }
+  else if (a === 'rate') { st.loanRates[v] = Math.max(0, +el.value || 0); saveSettings(); render(); }
+  else if (a === 'atype') { st.acctType[v] = el.value; saveSettings(); render(); }
+  else if (a === 'need') { const s = needsSet(); el.checked ? s.add(v) : s.delete(v); st.needs = Array.from(s); saveSettings(); render(); }
+  else if (a === 'rw') { st.runway.added = Math.max(0, +el.value || 0); saveSettings(); render(); }
+  else if (a === 'mt') { st.monthsTarget = Math.max(1, +el.value || 3); saveSettings(); render(); }
+  else if (a === 'pc') { st.paychecks = Math.max(1, +el.value || 26); saveSettings(); render(); }
+  else if (a === 'lim') { st.limits[el.dataset.k] = +el.value || 0; saveSettings(); render(); }
+  else if (a === 'pay') { const k = el.dataset.k, w = el.dataset.who; st.people[w][k] = (k === 'next') ? el.value : (el.value === '' ? '' : (+el.value || 0)); saveSettings(); render(); }
+});
+
+boot();
+})();
+
+</script>
+</body>
+</html>
