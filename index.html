@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1D4E89">
+<meta name="theme-color" content="#368727">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Money">
@@ -14,37 +14,38 @@
 <title>Chris & Sami · Money check-in</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="jszip.min.js"></script>
+<script src="paystubs.js"></script>
 <style>
 :root{
-  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#16202E; --muted:#566274; --line:#D3DAE3; --soft:#E4E9EF;
-  --accent:#1D4E89; --accent-ink:#FFFFFF; --good:#1B7A62; --warn:#A8690F; --bad:#B3372B;
-  --c1:#1D4E89; --c2:#2A9D8F; --c3:#C9822B; --c4:#8A5CA8; --c5:#B3372B; --c6:#6B7A8F;
-  --display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
-  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --bg:#FFFFFF; --surface:#FFFFFF; --ink:#212B26; --muted:#5E6B63; --line:#DDE3DE; --soft:#F2F5F1;
+  --accent:#368727; --accent-ink:#FFFFFF; --accent-deep:#1F5E14; --good:#368727; --warn:#B26A00; --bad:#C23B2E;
+  --c1:#368727; --c2:#0E7CB5; --c3:#E0A100; --c4:#7B5EA7; --c5:#C23B2E; --c6:#7A877E;
+  --display:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0F151D; --surface:#171F2A; --ink:#E7ECF2; --muted:#9AA7B8; --line:#2B3748; --soft:#212C3A;
-    --accent:#6EA8F2; --accent-ink:#0F151D; --good:#4CC3A1; --warn:#E2B14A; --bad:#F0877A;
-    --c1:#6EA8F2; --c2:#4CC3A1; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A1B5;
+    --bg:#121814; --surface:#1A221D; --ink:#E8EEE9; --muted:#9BAAA0; --line:#2C3830; --soft:#1F2923;
+    --accent:#5DB84A; --accent-ink:#0E1A0B; --accent-deep:#8FD97F; --good:#5DB84A; --warn:#E2B14A; --bad:#F0877A;
+    --c1:#5DB84A; --c2:#58B4E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0F151D; --surface:#171F2A; --ink:#E7ECF2; --muted:#9AA7B8; --line:#2B3748; --soft:#212C3A;
-  --accent:#6EA8F2; --accent-ink:#0F151D; --good:#4CC3A1; --warn:#E2B14A; --bad:#F0877A;
-  --c1:#6EA8F2; --c2:#4CC3A1; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A1B5;
+  --bg:#121814; --surface:#1A221D; --ink:#E8EEE9; --muted:#9BAAA0; --line:#2C3830; --soft:#1F2923;
+  --accent:#5DB84A; --accent-ink:#0E1A0B; --accent-deep:#8FD97F; --good:#5DB84A; --warn:#E2B14A; --bad:#F0877A;
+  --c1:#5DB84A; --c2:#58B4E6; --c3:#E2B14A; --c4:#B995D6; --c5:#F0877A; --c6:#93A599;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 *,*::before,*::after{box-sizing:inherit}
 body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body);-webkit-text-size-adjust:100%}
 .wrap{max-width:1040px;margin:0 auto;padding:20px 18px 64px}
-h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;letter-spacing:-.01em}
-h1{font-size:26px;line-height:1.1}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;letter-spacing:0}
+h1{font-size:28px;line-height:1.1;color:var(--accent-deep)}
 h2{font-size:21px;line-height:1.2;margin:0 0 4px}
 h3{font-size:16px;margin:0 0 6px}
 p{margin:0 0 10px}
@@ -55,17 +56,18 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 header.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 header.top .sub{font-size:13px;color:var(--muted);margin-top:4px}
-.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 14px;font-weight:600}
-.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:9px 20px;font-weight:600}
+.btn:hover{filter:brightness(.93)}
+.btn.ghost{background:transparent;color:var(--accent-deep);border:1px solid var(--accent)}
 .btn.small{padding:4px 10px;font-size:13px}
-nav.tabs{display:flex;gap:2px;overflow-x:auto;margin:18px 0 0;border-bottom:1px solid var(--line);scrollbar-width:none}
+nav.tabs{display:flex;gap:6px;overflow-x:auto;margin:18px 0 0;border-bottom:1px solid var(--line);scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;color:var(--muted);font-weight:500;white-space:nowrap;margin-bottom:-1px}
-nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+nav.tabs button[aria-selected="true"]{color:var(--accent-deep);border-bottom-color:var(--accent);font-weight:600}
 main>h2:first-child{margin-top:22px}
 section.blk{padding:26px 0 8px;border-bottom:1px solid var(--line)}
 section.blk:last-child{border-bottom:0}
-.verdict{font-family:var(--display);font-weight:700;font-size:clamp(22px,4.4vw,34px);line-height:1.15;letter-spacing:-.015em;margin:26px 0 6px;max-width:30ch}
+.verdict{font-family:var(--display);font-weight:600;font-size:clamp(22px,4.4vw,34px);line-height:1.15;letter-spacing:-.015em;margin:26px 0 6px;max-width:30ch}
 .lede{color:var(--muted);max-width:62ch;margin-bottom:14px}
 .track{position:relative;height:10px;background:var(--soft);border-radius:5px}
 .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--good)}
@@ -134,10 +136,12 @@ details>summary{cursor:pointer;font-weight:600;padding:2px 0}
 .mini{height:8px;background:var(--soft);border-radius:4px;position:relative;margin-top:6px;max-width:360px}
 .mini>span{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}
 .empty{padding:40px 0;max-width:56ch}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 28px;margin:12px 0}
-.kpi .v{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
+.kpi{background:var(--soft);border-radius:10px;padding:12px 14px;border-top:3px solid var(--accent)}
+.kpi .v{font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:-.01em}
 .kpi .l{font-size:12.5px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.paycard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0;background:var(--surface)}
 </style>
 </head>
 <body>
@@ -345,14 +349,14 @@ const CHECKS = [
 ];
 function checklist() { return (S.set && Array.isArray(S.set.checklist) && S.set.checklist.length) ? S.set.checklist : CHECKS; }
 function defaults() {
-  const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0 });
+  const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0, ytd: null, lastTypical: null });
   return {
     v: 1, acctType: {}, needs: null, monthsTarget: 3,
     loanRates: {},
     paychecks: 26, year: 2026,
     limits: { k401: 24500, hsa: 4400, ira: 7500, roLo: 242000, roHi: 252000 },
     people: { chris: person('Chris'), sami: person('Sami') },
-    checks: {},
+    checks: {}, depositMap: {}, history: {},
     runway: { added: 0 }
   };
 }
@@ -537,8 +541,8 @@ function tracker() {
   Object.keys(P).forEach(k => {
     const p = P[k], rem = remaining(p.next, st.year);
     const proj = (perPay, ytd) => (ytd !== '' && ytd != null && !isNaN(+ytd)) ? +ytd + perPay * rem : perPay * N;
-    rows.push({ k, who: p.label, acct: 'Roth 401(k)', per: p.roth401k, proj: proj(p.roth401k), lim: L.k401 });
-    rows.push({ k, who: p.label, acct: 'HSA' + (p.hsaSeed ? ' (with employer seed)' : ''), per: p.hsa, proj: proj(p.hsa) + (+p.hsaSeed || 0), lim: L.hsa, hsa: 1 });
+    rows.push({ k, who: p.label, acct: 'Roth 401(k)', per: p.roth401k, proj: proj(p.roth401k, p.ytd && p.ytd.roth401k), lim: L.k401 });
+    rows.push({ k, who: p.label, acct: 'HSA' + (p.hsaSeed ? ' (with employer seed)' : ''), per: p.hsa, proj: proj(p.hsa, p.ytd && p.ytd.hsa) + (+p.hsaSeed || 0), lim: L.hsa, hsa: 1 });
     rows.push({ k, who: p.label, acct: 'Roth IRA', per: p.rothIra, proj: proj(p.rothIra, p.ytdRothIra) + (+p.rothIraLump || 0), lim: L.ira, ira: 1 });
   });
   rows.forEach(r => r.left = r.lim - r.proj);
@@ -553,7 +557,7 @@ function header() {
   }
   return '<header class="top"><div><h1>Chris &amp; Sami</h1><div class="sub">' + esc(sub) + warn + '</div></div>' +
     '<button class="btn" data-a="tab" data-v="update">Update data</button></header>' +
-    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['loans', 'Loans'], ['runway', 'Runway'], ['update', 'Update']].map(t =>
+    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['pay', 'Pay'], ['loans', 'Loans'], ['runway', 'Runway'], ['update', 'Update']].map(t =>
       '<button role="tab" aria-selected="' + (S.tab === t[0]) + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav>';
 }
 function emptyView() {
@@ -709,6 +713,7 @@ function update() {
     '<details><summary>Or import a YNAB export file</summary><div class="drop" id="drop" style="margin-top:10px"><p style="font-weight:600;margin-bottom:6px">' + (S.busy ? 'Reading your export…' : 'Drop the YNAB export here') + '</p><p class="muted" style="margin-bottom:12px">The .zip, or the Plan and Register .csv files together.</p><input type="file" id="file" accept=".zip,.csv" multiple style="max-width:100%"></div>' +
     '<ol class="steps"><li>On a computer, open app.ynab.com and click your budget name, top left.</li><li>Choose <b>Export Budget Data</b>. A zip downloads.</li><li>Drop that zip above.</li></ol></details>' +
     '<p class="muted" style="font-size:13px;margin-top:10px">Your numbers stay in this browser. Nothing is sent anywhere except to YNAB when you sync.</p>' +
+    payBlock() +
     (sn ? '<section class="blk"><h2>Last import</h2><p>Data through <b>' + niceDate(sn.asOf) + '</b>. Imported ' + esc(new Date(sn.importedAt).toLocaleString()) + (sn.source ? ' from ' + esc(sn.source) : '') + '. ' + sn.rows.reg.toLocaleString() + ' transactions, ' + sn.months.length + ' months.</p>' +
       (stl.length ? '<h3>Accounts that need a balance update in YNAB</h3><ul class="alerts">' + stl.map(a => '<li><span class="mk"></span><span><b>' + esc(a.n) + '</b>, last activity ' + niceDate(a.last) + ' (' + fmt2(a.bal) + ')</span><span><button class="btn ghost small" data-a="ignore" data-v="' + esc(a.n) + '">Ignore</button></span></li>').join('') + '</ul>' : '<p class="good">Every investment account has been updated in the last 30 days.</p>') + '</section>' : '') +
     '<section class="blk"><h2>Settings</h2>' +
@@ -719,14 +724,215 @@ function update() {
     '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
 }
 
+
+
+/* ---------- pay history ---------- */
+function payModel(k) {
+  const raw = ((S.set.history || {})[k] || []).slice().sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  // fold checks issued on the same day (split pay periods)
+  const byDay = [];
+  raw.forEach(x => { const l = byDay[byDay.length - 1]; if (l && l.d === x.d) { l.merged = true; ['g', 'n', 't', 'r', 'h', 'o', 'i', 'b', 'm'].forEach(f => { if (x[f] != null) l[f] = (l[f] || 0) + x[f]; }); l.k = l.k || x.k; } else byDay.push(Object.assign({}, x)); });
+  const near = (a, b) => Math.abs(a - b) < 0.51;
+  byDay.forEach((x, i) => {
+    if (x.b != null && x.k) { x.base = x.b; x.extra = Math.max(0, x.g - x.b - (x.i || 0)); return; }
+    const prev = byDay[i - 1], next = byDay[i + 1];
+    x.reg = !!((prev && near(prev.g, x.g)) || (next && near(next.g, x.g)));
+  });
+  // one-time pay: a check that matches neither neighbour is measured against the nearest regular check
+  const days = d => Math.round(new Date(d + 'T12:00:00').getTime() / 86400000);
+  const isReg = y => y.reg || (y.base != null && y.extra === 0 && y.base > 0);
+  byDay.forEach((x, i) => {
+    if (x.base != null) return;
+    if (x.reg) { x.base = x.g; x.extra = 0; return; }
+    let pv = null, nx = null;
+    for (let j = i - 1; j >= 0 && !pv; j--) if (isReg(byDay[j])) pv = byDay[j];
+    for (let j = i + 1; j < byDay.length && !nx; j++) if (isReg(byDay[j])) nx = byDay[j];
+    const dp = pv ? days(x.d) - days(pv.d) : 1e9, dn = nx ? days(nx.d) - days(x.d) : 1e9;
+    if (Math.min(dp, dn) <= 7) { x.base = 0; x.extra = x.g; return; } // paid between normal paydays
+    const ref = dn <= dp ? nx : pv;
+    x.base = ref ? (ref.base != null ? ref.base : ref.g) : x.g; x.extra = Math.max(0, x.g - x.base);
+  });
+  // partial periods (a short first week, a pay period split across two checks) would read as huge raises
+  byDay.forEach((x, i) => {
+    if (!x.base) return;
+    const nb = byDay.slice(Math.max(0, i - 5), i + 6).filter((y, j) => y !== x && y.base).map(y => y.base).sort((a, b) => a - b);
+    const med = nb.length ? nb[Math.floor(nb.length / 2)] : x.base;
+    if (x.base < 0.7 * med) x.partial = true;
+  });
+  const raises = []; let cur = null;
+  byDay.forEach((x, i) => {
+    if (!x.base || x.partial) return;
+    if (cur == null) { cur = x.base; return; }
+    if (Math.abs(x.base - cur) > 0.5) {
+      const nx = byDay.slice(i + 1).find(y => y.base && !y.partial);
+      if (!nx || Math.abs(nx.base - x.base) < 0.51) { raises.push({ d: x.d, from: cur, to: x.base, pct: x.base / cur - 1 }); cur = x.base; }
+    }
+  });
+  return { rows: byDay, raises };
+}
+function stepChart(series, ttl) {
+  const W = 640, H = 230, L = 52, R = 14, T = 12, B = 28;
+  const pts = series.reduce((a, s) => a.concat(s.pts), []); if (pts.length < 2) return '';
+  const t0 = Math.min.apply(null, pts.map(p => p.t)), t1 = Math.max.apply(null, pts.map(p => p.t));
+  let mn = Math.min.apply(null, pts.map(p => p.v)), mx = Math.max.apply(null, pts.map(p => p.v)); const pad = (mx - mn) * 0.12 || mx * 0.05; mn = Math.max(0, mn - pad); mx += pad;
+  const x = t => L + (W - L - R) * (t - t0) / Math.max(1, t1 - t0), y = v => T + (H - T - B) * (1 - (v - mn) / Math.max(1, mx - mn));
+  let g = '';
+  for (let i = 0; i <= 3; i++) { const v = mn + (mx - mn) * i / 3; g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)"/><text x="' + (L - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end">' + fmt(Math.round(v / 50) * 50) + '</text>'; }
+  const y0 = new Date(t0).getFullYear(), y1 = new Date(t1).getFullYear(); let xl = '';
+  for (let yr = y0; yr <= y1; yr++) { const tx = x(new Date(yr, 0, 1).getTime()); if (tx > L + 8 && tx < W - R - 8) xl += '<line x1="' + tx.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="var(--line)" stroke-dasharray="3 4"/><text x="' + tx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + yr + '</text>'; }
+  const paths = series.map(s => { if (!s.pts.length) return ''; let d = 'M' + x(s.pts[0].t).toFixed(1) + ' ' + y(s.pts[0].v).toFixed(1); for (let i = 1; i < s.pts.length; i++) d += 'H' + x(s.pts[i].t).toFixed(1) + 'V' + y(s.pts[i].v).toFixed(1); d += 'H' + (W - R); return '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2.5" stroke-linejoin="round"/>'; }).join('');
+  const last = series.map(s => { const p = s.pts[s.pts.length - 1]; return p ? '<circle cx="' + (W - R) + '" cy="' + y(p.v).toFixed(1) + '" r="4" fill="' + s.color + '"><title>' + esc(s.name) + ': ' + fmt2(p.v) + '</title></circle>' : ''; }).join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(ttl) + '">' + g + xl + paths + last + '</svg>' +
+    '<div class="legend">' + series.filter(s => s.pts.length).map(s => '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ', latest ' + fmt2(s.pts[s.pts.length - 1].v) + '</span>').join('') + '</div>';
+}
+function pay() {
+  const st = S.set, P = st.people, keys = Object.keys(P), yr = st.year;
+  const M = {}; keys.forEach(k => { M[k] = payModel(k); });
+  const have = keys.filter(k => M[k].rows.length);
+  const hist = '<details><summary>Add earlier checks</summary><p class="muted" style="font-size:13px">Paste a list from a payroll site or an older system. Each check needs a date, a gross amount and a take-home amount, such as <i>Sep 24, 2026 Gross $4,615.38 Take Home $2,988.08</i>. Duplicates are skipped.</p>' +
+    '<div class="fld"><label for="histwho">Whose pay</label><select id="histwho">' + keys.map(k => '<option value="' + k + '">' + esc(P[k].label) + '</option>').join('') + '</select></div>' +
+    '<textarea id="histtext" rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:inherit" aria-label="Pasted pay history"></textarea>' +
+    '<div class="tools"><button class="btn small" data-a="histadd">Add to pay history</button></div></details>';
+  if (!have.length) return '<div class="empty"><h2>No pay history yet</h2><p class="muted">Drop pay stub PDFs on the Update tab and apply them, or paste older checks below.</p></div>' + hist;
+  let g = 0, n = 0, x = 0, reg = 0, tg = 0, tt = 0, sv = 0;
+  keys.forEach(k => {
+    const rows = M[k].rows, ry = rows.filter(r => r.d.slice(0, 4) === String(yr)), last = rows[rows.length - 1];
+    ry.forEach(r => { g += r.g; n += r.n; x += r.extra || 0; if (r.t != null) { tg += r.g; tt += r.t; } });
+    const lr = rows.slice().reverse().find(r => r.base && !r.partial); if (lr) reg += lr.base * st.paychecks;
+    const p = P[k]; if (p.ytd && +p.ytd.asOf.slice(0, 4) === yr) sv += (p.ytd.roth401k || 0) + (p.ytd.hsa || 0);
+  });
+  const kp = (v, l) => '<div class="kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
+  let out = '<h2>Pay</h2><p class="lede">Built from your pay stubs and earlier checks. Gross is before taxes and deductions; take-home is what lands in the bank.</p>' +
+    '<div class="kpis">' + kp(fmt(g), 'gross pay so far in ' + yr) + kp(fmt(n), 'take-home so far in ' + yr + ' (' + (g ? Math.round(n / g * 100) : 0) + '% of gross)') +
+    kp(fmt(reg), 'regular pay per year at today’s rates') + (tg ? kp(Math.round(tt / tg * 100) + '%', 'withheld in taxes, from stub detail') : '') + (sv ? kp(fmt(sv), 'saved through payroll in ' + yr + ' (Roth 401(k) and HSA)') : '') + (x > 50 ? kp(fmt(x), 'one-time pay in ' + yr) : '') + '</div>';
+  const colors = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)'], ts = d => new Date(d + 'T12:00:00').getTime();
+  const grossS = have.map((k, i) => ({ name: P[k].label, color: colors[i % 4], pts: M[k].rows.filter(r => r.base && !r.partial).map(r => ({ t: ts(r.d), v: r.base })) }));
+  const netS = have.map((k, i) => ({ name: P[k].label, color: colors[i % 4], pts: M[k].rows.filter(r => !r.extra && !r.partial && !r.merged && r.n > 0).map(r => ({ t: ts(r.d), v: r.n })) }));
+  out += '<section class="blk"><h3>Regular gross pay per paycheck</h3><p class="muted" style="font-size:13px">Steps up at each raise. One-time pay is left out.</p>' + stepChart(grossS, 'Regular gross pay per paycheck') + '</section>' +
+    '<section class="blk"><h3>Take-home per paycheck</h3><p class="muted" style="font-size:13px">Checks with bonuses or payouts are left out. Changes also reflect new deductions and tax settings.</p>' + stepChart(netS, 'Take-home per paycheck') + '</section>';
+  out += '<section class="blk"><h3>Year by year</h3><div class="tw"><table class="stmt"><thead><tr><th></th><th class="num">Checks</th><th class="num">Gross</th><th class="num">Take-home</th><th class="num">Kept</th><th class="num">One-time</th></tr></thead><tbody>';
+  have.forEach(k => {
+    const yrs = {}; M[k].rows.forEach(r => { const y = r.d.slice(0, 4); const o = yrs[y] || (yrs[y] = { c: 0, g: 0, n: 0, x: 0 }); o.c++; o.g += r.g; o.n += r.n; o.x += r.extra || 0; });
+    out += '<tr class="total"><th colspan="6" style="border-bottom:1px solid var(--line)">' + esc(P[k].label) + '</th></tr>';
+    Object.keys(yrs).sort().forEach(y => { const o = yrs[y]; out += '<tr><th>' + y + (+y === yr ? ' so far' : '') + '</th><td class="num">' + o.c + '</td><td class="num">' + fmt(o.g) + '</td><td class="num">' + fmt(o.n) + '</td><td class="num">' + Math.round(o.n / o.g * 100) + '%</td><td class="num">' + (o.x > 50 ? fmt(o.x) : '') + '</td></tr>'; });
+  });
+  out += '</tbody></table></div><p class="muted" style="font-size:13px">Kept is take-home divided by gross. It drops when you defer more into the 401(k) and HSA. A first year may be partial.</p></section>';
+  let rz = '', ot = '';
+  have.forEach(k => {
+    M[k].raises.forEach(r => { rz += '<li><span class="mk ok"></span><span><b>' + esc(P[k].label) + '</b>, ' + niceDate(r.d) + ': ' + fmt2(r.from) + ' to ' + fmt2(r.to) + ' per paycheck</span><span class="' + (r.pct >= 0 ? 'good' : 'bad') + '">' + (r.pct >= 0 ? '+' : '') + (r.pct * 100).toFixed(1) + '%</span></li>'; });
+    M[k].rows.filter(r => (r.extra || 0) > 50).forEach(r => { ot += '<li><span class="mk"></span><span><b>' + esc(P[k].label) + '</b>, ' + niceDate(r.d) + ': ' + fmt2(r.g) + ' gross, ' + fmt2(r.n) + ' take-home</span><span>+' + fmt(r.extra) + '</span></li>'; });
+  });
+  if (rz) out += '<section class="blk"><h3>Pay changes</h3><p class="muted" style="font-size:13px">Dated at the first paycheck on the new rate.</p><ul class="alerts">' + rz + '</ul></section>';
+  if (ot) out += '<section class="blk"><h3>Bonuses and one-time pay</h3><ul class="alerts">' + ot + '</ul></section>';
+  let lp = '';
+  have.forEach(k => {
+    const l = M[k].rows.slice().reverse().find(r => r.t != null); if (!l) return;
+    const rows = [['Gross pay', l.g], ['Taxes', -l.t], ['Roth 401(k)', -l.r], ['HSA', -l.h], ['Insurance and other', -l.o]];
+    lp += '<div><h3>' + esc(P[k].label) + ', ' + niceDate(l.d) + '</h3><table class="stmt"><tbody>' + rows.map(r => '<tr><th>' + r[0] + '</th><td class="num">' + fmt2(r[1]) + '</td></tr>').join('') + (l.i ? '<tr class="sub"><th>Taxable benefits that never reach you</th><td class="num">' + fmt2(-l.i) + '</td></tr>' : '') + '<tr class="total"><th>Take-home</th><td class="num">' + fmt2(l.n) + '</td></tr></tbody></table>' + (l.m ? '<p class="muted" style="font-size:13px">Employer 401(k) match on this check: ' + fmt2(l.m) + '.</p>' : '') + '</div>';
+  });
+  if (lp) out += '<section class="blk"><h3>Most recent checks</h3><div class="two">' + lp + '</div></section>';
+  return out + '<section class="blk">' + hist + '</section>';
+}
+
+/* ---------- pay stubs ---------- */
+const PAY_FIELDS = [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax'], ['roth401k', 'Roth 401(k)'], ['hsa', 'HSA'], ['pretaxOther', 'Insurance and other pre-tax'], ['otherPost', 'Other deductions'], ['brokerage', 'To brokerage'], ['rothIra', 'To Roth IRA']];
+const P2 = { stubs: [], busy: false };
+function payGuess(name) {
+  const n = (name || '').toLowerCase().replace(/[^a-z ]/g, '').trim(), P = S.set.people;
+  for (const k of Object.keys(P)) { const l = (P[k].label || '').toLowerCase().slice(0, 3); if (l && n.startsWith(l)) return k; }
+  return '';
+}
+function payGroups() {
+  const by = {}, P = S.set.people;
+  P2.stubs.forEach(s => { (by[s.name] = by[s.name] || []).push(s); });
+  return Object.keys(by).map(name => {
+    const who = (P2.who && P2.who[name] !== undefined) ? P2.who[name] : payGuess(name);
+    let stubs = by[name].slice();
+    const lt = who && P[who] && P[who].lastTypical;
+    if (lt && !stubs.some(s => s.date === lt.date)) stubs.push(Object.assign({ name }, lt));
+    stubs.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return { name, who, stubs, sum: window.PayStubs.summarize(stubs, S.set.depositMap), count: by[name].length };
+  });
+}
+function loadPdfjs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror = () => rej(new Error('The PDF reader did not load. Check your connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+async function importStubs(files) {
+  P2.busy = true; S.msg = null; render();
+  try {
+    const lib = await loadPdfjs(); let found = 0;
+    for (const f of files) {
+      if (!/\.pdf$/i.test(f.name)) continue;
+      const doc = await lib.getDocument({ data: new Uint8Array(await f.arrayBuffer()) }).promise, pages = [];
+      for (let i = 1; i <= doc.numPages; i++) {
+        const tc = await (await doc.getPage(i)).getTextContent();
+        pages.push({ items: tc.items.map(t => ({ s: t.str, x: t.transform[4], y: t.transform[5] })) });
+      }
+      const got = window.PayStubs.parsePages(pages); found += got.length;
+      got.forEach(s => { if (!P2.stubs.some(o => o.name === s.name && o.date === s.date && o.net === s.net && o.gross === s.gross)) P2.stubs.push(s); });
+    }
+    if (!found) S.msg = { err: true, t: 'No pay stubs found in those files. This reads Paylocity earnings statements and Workday payroll advices as PDFs.' };
+    else S.msg = { t: 'Read ' + found + ' pay stub' + (found === 1 ? '' : 's') + '. Review the changes below, then apply them.' };
+  } catch (e) { S.msg = { err: true, t: 'Could not read that PDF. ' + ((e && e.message) || '') }; }
+  P2.busy = false; render();
+  const c = document.querySelector('.paycard'); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'start' });
+}
+function payApply(idx) {
+  const g = payGroups()[idx]; if (!g || !g.who || !g.sum) return;
+  const st = S.set, p = st.people[g.who], o = g.sum;
+  PAY_FIELDS.forEach(f => { if (o[f[0]] !== undefined) p[f[0]] = o[f[0]]; });
+  const yr = +o.date.slice(0, 4);
+  if (yr === st.year) {
+    p.ytd = { asOf: o.date, roth401k: o.ytd.roth401k, hsa: o.ytd.hsa, gross: o.ytd.gross };
+    const d = new Date(o.date + 'T12:00:00'); d.setDate(d.getDate() + 14); p.next = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  } else p.ytd = null;
+  const T = g.stubs.filter(s => s.typical).pop();
+  if (T) p.lastTypical = { date: T.date, base: T.base, gross: T.gross, imputed: T.imputed, taxes: T.taxes, roth401k: T.roth401k, hsa: T.hsa, pretaxOther: T.pretaxOther, otherPost: T.otherPost, other: [], typical: true, deposits: T.deposits, ytd: T.ytd, match: T.match };
+  st.history = st.history || {};
+  st.history[g.who] = window.PayStubs.mergeHistory(st.history[g.who], P2.stubs.filter(s => s.name === g.name).map(window.PayStubs.toRecord));
+  saveSettings();
+  S.msg = { t: 'Updated ' + p.label + '’s paycheck numbers from the ' + niceDate(o.date) + ' check and added it to pay history.' };
+  P2.stubs = P2.stubs.filter(s => s.name !== g.name); render();
+}
+function payBlock() {
+  const P = S.set.people, groups = payGroups();
+  let h = '<section class="blk"><h2>Pay stubs</h2><p class="lede">Drop your Paylocity or Workday pay stub PDFs. The newest stub for each person updates the paycheck numbers, and year-to-date totals feed the retirement tracker. Files are read in this browser and never uploaded.</p>' +
+    '<div class="drop"><p style="font-weight:600;margin-bottom:6px">' + (P2.busy ? 'Reading your pay stubs…' : 'Choose your pay stub PDFs') + '</p><p class="muted" style="margin-bottom:12px">One file or many. A combined PDF of every stub works.</p><input type="file" id="stubfile" data-a="stubfile" accept=".pdf,application/pdf" multiple style="max-width:100%"></div>';
+  groups.forEach((g, i) => {
+    const o = g.sum;
+    h += '<div class="paycard"><div class="tools" style="margin-top:0"><h3 style="margin:0">' + esc(g.name) + '</h3><span class="muted">' + g.count + ' stub' + (g.count === 1 ? '' : 's') + ', newest ' + niceDate(g.stubs[g.stubs.length - 1].date) + ', ' + esc(g.stubs[g.stubs.length - 1].src) + '</span></div>' +
+      '<div class="fld"><label for="sw' + i + '">This is</label><select id="sw' + i + '" data-a="stubwho" data-v="' + esc(g.name) + '"><option value=""' + (g.who ? '' : ' selected') + '>Skip this one</option>' + Object.keys(P).map(k => '<option value="' + k + '"' + (g.who === k ? ' selected' : '') + '>' + esc(P[k].label) + '</option>').join('') + '</select></div>';
+    if (g.who && o) {
+      const p = P[g.who];
+      h += '<div class="tw"><table class="stmt"><thead><tr><th>Per paycheck</th><th class="num">In the app</th><th class="num">From the stub</th></tr></thead><tbody>' +
+        PAY_FIELDS.filter(f => o[f[0]] !== undefined).map(f => { const a = +p[f[0]] || 0, b = o[f[0]], ch = Math.abs(a - b) >= 0.01; return '<tr><th>' + f[1] + '</th><td class="num muted">' + fmt2(a) + '</td><td class="num"' + (ch ? ' style="font-weight:600"' : '') + '>' + fmt2(b) + '</td></tr>'; }).join('') +
+        '</tbody></table></div>' +
+        '<p class="muted" style="font-size:13px">Year to date at ' + niceDate(o.date) + ': Roth 401(k) ' + fmt2(o.ytd.roth401k) + ', HSA ' + fmt2(o.ytd.hsa) + ', gross ' + fmt2(o.ytd.gross) + '. Taxes include state paid leave premiums.</p>' +
+        (o.notes.length ? '<ul class="alerts">' + o.notes.map(n => '<li><span class="mk"></span><span>' + esc(n) + '</span><span></span></li>').join('') + '</ul>' : '');
+      const accts = Array.from(new Set(o.deposits.map(d => d.last4)));
+      if (accts.length) h += '<details><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Tell the app where each deposit goes. Only brokerage and Roth IRA deposits change the numbers above.</p>' +
+        accts.map(a => { const cur = (S.set.depositMap || {})[a] || 'checking', amt = o.deposits.filter(d => d.last4 === a).reduce((s, d) => s + d.amt, 0); return '<div class="fld"><label for="dm' + a + i + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="dm' + a + i + '" data-a="stubdep" data-v="' + a + '">' + [['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']].map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>'; }).join('') + '</details>';
+      h += '<div class="tools"><button class="btn" data-a="stubapply" data-v="' + i + '">Use these numbers for ' + esc(p.label) + '</button></div>';
+    }
+    h += '</div>';
+  });
+  return h + '</section>';
+}
+
 /* ---------- render ---------- */
 function render() {
   const app = $('#app'); if (!app) return;
   const focusId = document.activeElement && document.activeElement.id;
   let body;
   if (S.tab === 'update') body = update();
-  else if (!S.snap) body = emptyView();
-  else body = ({ overview, plan, retire, loans, runway }[S.tab] || overview)();
+  else if (!S.snap && S.tab !== 'pay') body = emptyView();
+  else body = ({ overview, plan, retire, pay, loans, runway }[S.tab] || overview)();
   app.innerHTML = header() + '<main>' + (S.tab !== 'update' && S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') + body + '</main>';
   wireDrop();
   if (focusId) { const el = document.getElementById(focusId); if (el && el.focus) try { el.focus(); } catch (e) { } }
@@ -849,6 +1055,12 @@ document.addEventListener('click', async ev => {
   if (a === 'tab') { S.tab = v; S.msg = (v === 'update') ? S.msg : null; render(); window.scrollTo(0, 0); if (v === 'update') ynabEnsure(); }
   else if (a === 'ignore') { S.set.acctType[v] = 'ignore'; saveSettings(); render(); }
   else if (a === 'reset') { S.set = defaults(); saveSettings(); S.msg = { t: 'Settings reset to defaults.' }; render(); }
+  else if (a === 'stubapply') { payApply(+v); }
+  else if (a === 'histadd') {
+    const who = document.getElementById('histwho').value, recs = window.PayStubs.parseHistoryText(document.getElementById('histtext').value);
+    if (!recs.length) { S.msg = { err: true, t: 'No checks found. Each needs a date, a gross amount and a take-home amount.' }; render(); return; }
+    const st = S.set; st.history = st.history || {}; const before = (st.history[who] || []).length; st.history[who] = window.PayStubs.mergeHistory(st.history[who], recs);
+    saveSettings(); S.msg = { t: 'Added ' + (st.history[who].length - before) + ' check(s) to ' + st.people[who].label + '\u2019s pay history.' }; render(); }
   else if (a === 'ynabsave') { await ynabConnect(); }
   else if (a === 'ynabsync') { await ynabSync(); }
   else if (a === 'ynabforget') { tokSet(''); tokBudgetSet(''); Y.budgets = null; S.msg = { t: 'Disconnected. The token was removed from this browser.' }; render(); }
@@ -866,7 +1078,10 @@ document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key =
 document.addEventListener('change', ev => {
   const el = ev.target; if (!el.dataset || !el.dataset.a) return;
   const a = el.dataset.a, v = el.dataset.v, st = S.set;
-  if (a === 'restore') { restoreFile(el.files && el.files[0]); }
+  if (a === 'stubfile') { if (el.files && el.files.length) importStubs(Array.from(el.files)); }
+  else if (a === 'stubwho') { P2.who = P2.who || {}; P2.who[v] = el.value; render(); }
+  else if (a === 'stubdep') { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; saveSettings(); render(); }
+  else if (a === 'restore') { restoreFile(el.files && el.files[0]); }
   else if (a === 'ynabbudget') { tokBudgetSet(el.value); render(); }
   else if (a === 'month') { S.month = el.value; S.openCat = null; render(); }
   else if (a === 'wed') { S.exclWedding = el.checked; render(); }
