@@ -362,7 +362,7 @@ const CHECKS = [
 ];
 function checklist() { return (S.set && Array.isArray(S.set.checklist) && S.set.checklist.length) ? S.set.checklist : CHECKS; }
 function defaults() {
-  const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0, ytd: null, lastTypical: null });
+  const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, moneyMarket: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0, ytd: null, lastTypical: null });
   return {
     v: 1, acctType: {}, needs: null, monthsTarget: 3,
     loanRates: {},
@@ -536,17 +536,17 @@ function remaining(next, year) { // paydays left in the year, biweekly from `nex
 }
 function calc() {
   const st = S.set, P = st.people, N = st.paychecks;
-  let gross = 0, taxes = 0, ded = 0, employer = 0, toChecking = 0; const sv = { roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0 }, per = {};
+  let gross = 0, taxes = 0, ded = 0, employer = 0, toChecking = 0; const sv = { roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, moneyMarket: 0 }, per = {};
   Object.keys(P).forEach(k => {
     const p = P[k], g = p.gross * N, t = p.taxes * N, d = (p.pretaxOther + p.otherPost) * N;
     const emp = g * p.matchPct / 100 + g * p.annualEmpPct / 100 + (+p.hsaSeed || 0);
-    const chk = (p.gross - p.taxes - p.pretaxOther - p.otherPost - p.roth401k - p.hsa - p.rothIra - p.brokerage) * N;
+    const chk = (p.gross - p.taxes - p.pretaxOther - p.otherPost - p.roth401k - p.hsa - p.rothIra - p.brokerage - (+p.moneyMarket || 0)) * N;
     per[k] = { gross: g, taxes: t, ded: d, employer: emp, chk };
     gross += g; taxes += t; ded += d; employer += emp; toChecking += chk;
-    sv.roth401k += p.roth401k * N; sv.hsa += p.hsa * N; sv.rothIra += p.rothIra * N; sv.brokerage += p.brokerage * N;
+    sv.roth401k += p.roth401k * N; sv.hsa += p.hsa * N; sv.rothIra += p.rothIra * N; sv.brokerage += p.brokerage * N; sv.moneyMarket += (+p.moneyMarket || 0) * N;
   });
   sv.lump = Object.keys(P).reduce((s, k) => s + (+P[k].rothIraLump || 0), 0); // IRA money put in outside payroll, e.g. a backdoor lump sum
-  const savedAll = sv.roth401k + sv.hsa + sv.rothIra + sv.brokerage + sv.lump;
+  const savedAll = sv.roth401k + sv.hsa + sv.rothIra + sv.brokerage + sv.moneyMarket + sv.lump;
   let planned = 0; monthRows(latestMonth()).forEach(r => { if (r.a > 0) planned += r.a; });
   const surplus = toChecking / 12 - planned;
   return { gross, taxes, ded, employer, toChecking, sv, savedAll, per, planned, surplus };
@@ -557,15 +557,15 @@ function depAccts(w) { // direct deposit accounts on the person's newest normal 
   return Object.keys(by).map(a => ({ last4: a, amt: by[a] }));
 }
 function depUnmapped(w) { const dm = S.set.depositMap || {}, a = depAccts(w); return a.length > 1 && a.every(x => !dm[x.last4]); } // no account has been assigned yet, not even to checking
-function rederiveDeposits(w) { // re-split brokerage and Roth IRA from the stored stub after the account map changes
+function rederiveDeposits(w) { // re-split brokerage, Roth IRA and money market from the stored stub after the account map changes
   const p = S.set.people[w], lt = p.lastTypical; if (!lt || !lt.deposits || !lt.deposits.length) return;
-  const dm = S.set.depositMap || {}; let ira = 0, brk = 0;
-  lt.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'rothIra') ira += d.amt; else if (k === 'brokerage') brk += d.amt; });
-  p.rothIra = Math.round(ira * 100) / 100; p.brokerage = Math.round(brk * 100) / 100;
+  const dm = S.set.depositMap || {}; let ira = 0, brk = 0, mm = 0;
+  lt.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'rothIra') ira += d.amt; else if (k === 'brokerage') brk += d.amt; else if (k === 'moneyMarket') mm += d.amt; });
+  p.rothIra = Math.round(ira * 100) / 100; p.brokerage = Math.round(brk * 100) / 100; p.moneyMarket = Math.round(mm * 100) / 100;
 }
 function depSelect(a, amt, id) {
   const cur = (S.set.depositMap || {})[a] || '';
-  return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + (cur ? [] : [['', 'Not set (counts as checking)']]).concat([['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']]).map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
+  return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + (cur ? [] : [['', 'Not set (counts as checking)']]).concat([['checking', 'Checking or savings'], ['moneyMarket', 'Money market'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']]).map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
 }
 function tracker() {
   const st = S.set, P = st.people, L = st.limits, N = st.paychecks, rows = [];
@@ -634,7 +634,7 @@ function plan() {
   const m = x => x / 12, g = c.gross || 1;
   const rows = [
     ['Gross pay', c.gross, 'head'], ['Taxes', -c.taxes], ['Insurance and parking', -c.ded],
-    ['Roth 401(k)', -c.sv.roth401k, 'sub'], ['HSA', -c.sv.hsa, 'sub'], ['Roth IRA', -c.sv.rothIra, 'sub'], ['Brokerage', -c.sv.brokerage, 'sub'],
+    ['Roth 401(k)', -c.sv.roth401k, 'sub'], ['HSA', -c.sv.hsa, 'sub'], ['Roth IRA', -c.sv.rothIra, 'sub'], ['Brokerage', -c.sv.brokerage, 'sub'], ['Money market', -c.sv.moneyMarket, 'sub'],
     ['Deposited to checking', c.toChecking, 'tot'], ['Planned spending (YNAB targets)', -c.planned * 12], ['Left over', c.surplus * 12, 'tot']
   ];
   const seg = [[c.taxes, 'var(--c6)', 'Taxes'], [c.ded, 'var(--c4)', 'Insurance'], [c.savedAll, 'var(--c1)', 'Saved through payroll'], [c.planned * 12, 'var(--c3)', 'Planned spending'], [Math.max(0, c.surplus * 12), 'var(--c2)', 'Left over']];
@@ -705,7 +705,7 @@ function runway() {
     '<tr><th>' + esc(kept) + '’s take-home</th>' + R.sc.map(() => '<td class="num">' + fmt(-R.keep) + '</td>').join('') + '</tr>' +
     '<tr class="total"><th>Monthly gap</th>' + R.sc.map(s => '<td class="num ' + (s.gap > 0 ? 'bad' : 'good') + '">' + (s.gap > 0 ? fmt(s.gap) : 'Covered, ' + fmt(-s.gap) + ' spare') + '</td>').join('') + '</tr>' +
     '<tr><th>Runway from savings</th>' + R.sc.map(s => '<td class="num">' + moTxt(s) + '</td>').join('') + '</tr></tbody></table></div>' +
-    '<p class="muted" style="font-size:13px">Assumes ' + esc(kept) + '’s pay and deductions stay as they are, and that ' + esc(lost) + '’s Roth IRA, brokerage and 401(k) saving stops. Added costs are your own estimate, such as replacing employer health coverage (' + fmt(R.added) + ' a month). Change them under Settings. Self-employment taxes and business costs aren’t modeled.</p>' +
+    '<p class="muted" style="font-size:13px">Assumes ' + esc(kept) + '’s pay and deductions stay as they are, and that ' + esc(lost) + '’s Roth IRA, brokerage, money market and 401(k) saving stops. Added costs are your own estimate, such as replacing employer health coverage (' + fmt(R.added) + ' a month). Change them under Settings. Self-employment taxes and business costs aren’t modeled.</p>' +
     '<section class="blk"><h3>Side by side</h3><div class="tw"><table class="stmt"><thead><tr><th>Runway from savings</th>' + R.sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' + both + '</tbody></table></div></section>' +
     '<section class="blk"><h2>Reading this</h2><p class="lede">Needs only means rent, parking, utilities, insurance, groceries, gas, loan minimums and the other needs ticked under Settings. Retirement and HSA balances are left out, since tapping them early costs penalties.</p></section>';
 }
@@ -739,7 +739,7 @@ function update() {
   const needList = sn ? Array.from(new Set(sn.cats.filter(c => kindOf(c.g, c.c) !== 'ignore').map(c => c.c))) : [];
   const stl = sn ? stale() : [];
   const pf = (who, k, lab, step) => '<div class="fld"><label for="p-' + who + k + '">' + lab + '</label><input id="p-' + who + k + '" type="number" step="' + (step || '0.01') + '" value="' + (st.people[who][k] === '' ? '' : st.people[who][k]) + '" data-a="pay" data-who="' + who + '" data-k="' + k + '"></div>';
-  const people = Object.keys(st.people).map(w => '<h3 style="margin-top:14px">' + esc(st.people[w].label) + '</h3>' + [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax per paycheck'], ['otherPost', 'Other post-tax deductions (parking) per paycheck'], ['roth401k', 'Roth 401(k) per paycheck'], ['hsa', 'HSA per paycheck'], ['rothIra', 'Roth IRA per paycheck'], ['brokerage', 'Brokerage per paycheck'], ['pretaxOther', 'Other pre-tax (insurance) per paycheck'], ['matchPct', 'Employer match, % of pay'], ['matchNeeds', 'Your deferral needed for full match, %'], ['annualEmpPct', 'Annual employer contribution, % of pay'], ['hsaSeed', 'Employer HSA seed per year', '1'], ['rothIraLump', 'Roth IRA contributed outside payroll', '1'], ['ytdRothIra', 'Roth IRA contributed so far via payroll (optional)', '1']].map(f => pf(w, f[0], f[1], f[2])).join('') + (function () { const da = depAccts(w); return da.length ? '<details' + (depUnmapped(w) ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Deposits marked Brokerage or Roth IRA count as savings and fill the two fields above. Everything else counts as checking.</p>' + da.map(x => depSelect(x.last4, x.amt, 'sdm' + w + x.last4)).join('') + '</details>' : ''; })() + '<div class="fld"><label for="n-' + w + '">Next payday</label><input id="n-' + w + '" type="date" value="' + st.people[w].next + '" data-a="pay" data-who="' + w + '" data-k="next"></div>').join('');
+  const people = Object.keys(st.people).map(w => '<h3 style="margin-top:14px">' + esc(st.people[w].label) + '</h3>' + [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax per paycheck'], ['otherPost', 'Other post-tax deductions (parking) per paycheck'], ['roth401k', 'Roth 401(k) per paycheck'], ['hsa', 'HSA per paycheck'], ['rothIra', 'Roth IRA per paycheck'], ['brokerage', 'Brokerage per paycheck'], ['moneyMarket', 'Money market per paycheck'], ['pretaxOther', 'Other pre-tax (insurance) per paycheck'], ['matchPct', 'Employer match, % of pay'], ['matchNeeds', 'Your deferral needed for full match, %'], ['annualEmpPct', 'Annual employer contribution, % of pay'], ['hsaSeed', 'Employer HSA seed per year', '1'], ['rothIraLump', 'Roth IRA contributed outside payroll', '1'], ['ytdRothIra', 'Roth IRA contributed so far via payroll (optional)', '1']].map(f => pf(w, f[0], f[1], f[2])).join('') + (function () { const da = depAccts(w); return da.length ? '<details' + (depUnmapped(w) ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Deposits marked Money market, Brokerage or Roth IRA count as savings and fill the matching fields above. Everything else counts as checking.</p>' + da.map(x => depSelect(x.last4, x.amt, 'sdm' + w + x.last4)).join('') + '</details>' : ''; })() + '<div class="fld"><label for="n-' + w + '">Next payday</label><input id="n-' + w + '" type="date" value="' + st.people[w].next + '" data-a="pay" data-who="' + w + '" data-k="next"></div>').join('');
   return (S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') +
     (function () {
       const tok = tokGet(), bid = tokBudget();
@@ -788,7 +788,7 @@ function flags() {
     else if (r.left > 1 && r.ira) add('info', r.who + '’s Roth IRA has ' + fmt(r.left) + ' of room left for ' + st.year + ', open until Apr 15, ' + (st.year + 1) + '.');
   });
   Object.keys(P).forEach(k => { const p = P[k], d = p.gross ? p.roth401k / p.gross * 100 : 0; if (p.gross && d + 0.01 < p.matchNeeds) add('warn', p.label + ' defers ' + d.toFixed(1) + '% to the 401(k) but needs ' + p.matchNeeds + '% for the full employer match.'); });
-  Object.keys(P).forEach(k => { if (depUnmapped(k)) add('warn', P[k].label + '\u2019s pay goes to ' + depAccts(k).length + ' accounts, and none has been assigned yet, so any brokerage or Roth IRA deposits are counted as checking and left out of the savings rate. Assign them under Settings on the Update tab.'); });
+  Object.keys(P).forEach(k => { if (depUnmapped(k)) add('warn', P[k].label + '\u2019s pay goes to ' + depAccts(k).length + ' accounts, and none has been assigned yet, so any money market, brokerage or Roth IRA deposits are counted as checking and left out of the savings rate. Assign them under Settings on the Update tab.'); });
   const magi = magiNow();
   if (magi > L.roHi) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', above the ' + fmt(L.roHi) + ' Roth IRA limit. Roth IRA money goes in through the backdoor.');
   else if (magi > L.roLo) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', inside the Roth IRA phase-out range. Wait for the W-2s before choosing direct or backdoor.');
@@ -808,7 +808,7 @@ function insightContext() {
   const r1 = x => Math.round(x), people = {};
   Object.keys(P).forEach(k => {
     const p = P[k], m = payModel(k), last = m.rows[m.rows.length - 1];
-    people[p.label] = { grossPerPaycheck: p.gross, taxesPerPaycheck: p.taxes, roth401kPerPaycheck: p.roth401k, hsaPerPaycheck: p.hsa, toRothIraPerPaycheck: p.rothIra, toBrokeragePerPaycheck: p.brokerage, nextPayday: p.next, ytd: p.ytd || null, matchNeedsPct: p.matchNeeds, latestStubDate: last ? last.d : null, raises: m.raises.slice(-3).map(r => ({ date: r.d, from: r.from, to: r.to })) };
+    people[p.label] = { grossPerPaycheck: p.gross, taxesPerPaycheck: p.taxes, roth401kPerPaycheck: p.roth401k, hsaPerPaycheck: p.hsa, toRothIraPerPaycheck: p.rothIra, toBrokeragePerPaycheck: p.brokerage, toMoneyMarketPerPaycheck: +p.moneyMarket || 0, nextPayday: p.next, ytd: p.ytd || null, matchNeedsPct: p.matchNeeds, latestStubDate: last ? last.d : null, raises: m.raises.slice(-3).map(r => ({ date: r.d, from: r.from, to: r.to })) };
   });
   const rc = { chris: runwayCalc('chris'), sami: runwayCalc('sami') }, run = {};
   Object.keys(rc).forEach(k => { run['if' + P[k].label + 'LosesPay'] = { monthlyTakeHomeKept: r1(rc[k].keep), addedMonthlyCosts: r1(rc[k].added), monthsOfRunwayNeedsOnly: isFinite(rc[k].sc[0].mo) ? +rc[k].sc[0].mo.toFixed(1) : 'covered', monthsOfRunwayAllTargets: isFinite(rc[k].sc[1].mo) ? +rc[k].sc[1].mo.toFixed(1) : 'covered' }; });
@@ -946,7 +946,7 @@ function pay() {
 }
 
 /* ---------- pay stubs ---------- */
-const PAY_FIELDS = [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax'], ['roth401k', 'Roth 401(k)'], ['hsa', 'HSA'], ['pretaxOther', 'Insurance and other pre-tax'], ['otherPost', 'Other deductions'], ['brokerage', 'To brokerage'], ['rothIra', 'To Roth IRA']];
+const PAY_FIELDS = [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax'], ['roth401k', 'Roth 401(k)'], ['hsa', 'HSA'], ['pretaxOther', 'Insurance and other pre-tax'], ['otherPost', 'Other deductions'], ['brokerage', 'To brokerage'], ['moneyMarket', 'To money market'], ['rothIra', 'To Roth IRA']];
 const P2 = { stubs: [], busy: false };
 function payGuess(name) {
   const n = (name || '').toLowerCase().replace(/[^a-z ]/g, '').trim(), P = S.set.people;
@@ -1028,7 +1028,7 @@ function payBlock() {
         (o.notes.length ? '<ul class="alerts">' + o.notes.map(n => '<li><span class="mk"></span><span>' + esc(n) + '</span><span></span></li>').join('') + '</ul>' : '');
       const accts = Array.from(new Set(o.deposits.map(d => d.last4)));
       const dm0 = S.set.depositMap || {}, open0 = accts.length > 1 && accts.every(a => !dm0[a]);
-      if (accts.length) h += '<details' + (open0 ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Tell the app where each deposit goes. Only brokerage and Roth IRA deposits change the numbers above.</p>' +
+      if (accts.length) h += '<details' + (open0 ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Tell the app where each deposit goes. Only money market, brokerage and Roth IRA deposits change the numbers above.</p>' +
         accts.map(a => depSelect(a, o.deposits.filter(d => d.last4 === a).reduce((s, d) => s + d.amt, 0), 'dm' + a + i)).join('') + '</details>';
       h += '<div class="tools"><button class="btn" data-a="stubapply" data-v="' + i + '">Use these numbers for ' + esc(p.label) + '</button></div>';
     }

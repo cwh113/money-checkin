@@ -219,16 +219,16 @@
     }
     // direct deposit split
     const dm = depositMap || {};
-    const sums = { brokerage: 0, rothIra: 0, other: 0, mapped: false };
-    latest.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'brokerage') { sums.brokerage += d.amt; sums.mapped = true; } else if (k === 'rothIra') { sums.rothIra += d.amt; sums.mapped = true; } });
+    const sums = { brokerage: 0, rothIra: 0, moneyMarket: 0, other: 0, mapped: false };
+    latest.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'brokerage') { sums.brokerage += d.amt; sums.mapped = true; } else if (k === 'rothIra') { sums.rothIra += d.amt; sums.mapped = true; } else if (k === 'moneyMarket') { sums.moneyMarket += d.amt; sums.mapped = true; } });
     if (sums.mapped) {
-      o.rothIra = r2(sums.rothIra);
+      o.rothIra = r2(sums.rothIra); o.moneyMarket = r2(sums.moneyMarket);
       if (latest.typical) o.brokerage = r2(sums.brokerage);
       else {
         // brokerage takes what's left over, so re-derive it for a normal check
         const fixedOther = latest.deposits.reduce((s, d) => { const k = dm[d.last4] || 'checking'; return s + (k === 'checking' ? d.amt : 0); }, 0);
         const netNormal = o.gross - o.taxes - o.roth401k - o.hsa - o.pretaxOther - o.otherPost;
-        o.brokerage = r2(Math.max(0, netNormal - fixedOther - o.rothIra));
+        o.brokerage = r2(Math.max(0, netNormal - fixedOther - o.rothIra - o.moneyMarket));
         notes.push('Brokerage per check is estimated, because the brokerage deposit takes whatever is left after the fixed deposits.');
       }
     }
