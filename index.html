@@ -137,6 +137,14 @@ details>summary{cursor:pointer;font-weight:600;padding:2px 0}
 .chk.done .t{text-decoration:line-through;color:var(--muted)}
 .chk .note{font-size:13.5px;color:var(--muted)}
 .chk .due{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.chk .auto{font-size:12px;color:var(--good);margin-left:6px}
+.contrib input[type=number]{width:96px;text-align:right}
+.contrib input[type=date]{font-size:12px;width:128px}
+.contrib .sm,.ptab .sm{font-size:12px;color:var(--muted)}
+.ptab td,.ptab th{white-space:nowrap}
+.ptab .src{padding-left:16px}
+.ptab .del{padding:2px 8px;font-size:12px}
+.stepadd{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:12px}
 .mini{height:8px;background:var(--soft);border-radius:4px;position:relative;margin-top:6px;max-width:360px}
 .mini>span{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}
 .empty{padding:40px 0;max-width:56ch}
@@ -360,7 +368,28 @@ const CHECKS = [
   { id: 'magi', t: 'January: compute MAGI from the W-2s, then choose direct or backdoor Roth', due: '2027-01-31' },
   { id: 'rates', t: 'Verify student loan rates with your servicer', n: 'Rates are entered on the Loans tab.' }
 ];
-function checklist() { return (S.set && Array.isArray(S.set.checklist) && S.set.checklist.length) ? S.set.checklist : CHECKS; }
+function baseSteps(y) { // the standing plan; annual steps are re-created for each plan year
+  return [
+    { id: 'ef', t: 'Build the emergency fund to the months-of-needs target', n: 'Ticks itself when the emergency fund reaches the target.', auto: 'ef' },
+    { id: 'hsa', t: 'Top off both HSAs for ' + y, n: 'Ticks itself when every HSA is full or marked done on the Retirement tab.', due: y + '-12-31', auto: 'hsa' },
+    { id: 'roth', t: 'Fund both ' + y + ' Roth IRAs', n: 'Ticks itself when every Roth IRA is full or marked done on the Retirement tab. Deadline is April 15.', due: (y + 1) + '-04-15', auto: 'ira' },
+    { id: 'magi', t: 'January: compute ' + y + ' MAGI from the W-2s, then choose direct or backdoor Roth', due: (y + 1) + '-01-31' },
+    { id: 'rates', t: 'Verify student loan rates with your servicer', n: 'Rates are entered on the Loans tab.', once: 1 }
+  ];
+}
+function checklist() { // legacy override list, else the standing plan, plus steps you added for this year
+  const st = S.set, y = st.year;
+  const base = (Array.isArray(st.checklist) && st.checklist.length) ? st.checklist : baseSteps(y);
+  return base.concat((st.steps || []).filter(x => !x.year || x.year === y).map(x => Object.assign({ custom: 1 }, x)));
+}
+function stepKey(x) { return x.once || x.custom ? x.id : S.set.year + ':' + x.id; }
+function autoDone(kind) {
+  if (!kind) return false;
+  if (kind === 'ef') { if (!S.snap) return false; const ns = monthlyNeeds(); return ns > 0 && typeTotals(curIdx()).emergency >= S.set.monthsTarget * ns; }
+  const rows = tracker().filter(r => kind === 'hsa' ? r.hsa : r.ira);
+  return rows.length > 0 && rows.every(r => r.done || r.left < 1);
+}
+function steps() { return checklist().map(x => { const key = stepKey(x), man = !!S.set.checks[key], au = autoDone(x.auto); return Object.assign({}, x, { key, man, au, done: man || au }); }); }
 function defaults() {
   const person = label => ({ label, gross: 0, roth401k: 0, hsa: 0, rothIra: 0, brokerage: 0, moneyMarket: 0, taxes: 0, otherPost: 0, pretaxOther: 0, matchPct: 0, matchNeeds: 0, annualEmpPct: 0, hsaSeed: 0, next: todayIso(), ytdRothIra: '', rothIraLump: 0, ytd: null, lastTypical: null });
   return {
@@ -369,7 +398,7 @@ function defaults() {
     paychecks: 26, year: 2026,
     limits: { k401: 24500, hsa: 4400, ira: 7500, roLo: 242000, roHi: 252000 },
     people: { chris: person('Chris'), sami: person('Sami') },
-    checks: {}, depositMap: {}, history: {},
+    checks: {}, depositMap: {}, history: {}, contrib: {}, steps: [],
     goals: '',
     runway: { added: 0, addedSami: 0 }
   };
@@ -401,7 +430,10 @@ function saveSettings() {
 }
 function applyDoc(kind, data) {
   if (kind === 'snap') S.snap = (data && data.months) ? data : null;
-  else S.set = mergeDefaults(data ? clone(data) : {}, defaults());
+  else {
+    S.set = mergeDefaults(data ? clone(data) : {}, defaults());
+    ['ef', 'hsa', 'roth', 'magi'].forEach(id => { if (S.set.checks[id] !== undefined) { if (S.set.checks['2026:' + id] === undefined) S.set.checks['2026:' + id] = S.set.checks[id]; delete S.set.checks[id]; } });
+  }
   S.loaded[kind] = true;
   if (S.snap && (!S.month || S.snap.months.indexOf(S.month) < 0)) S.month = latestMonth();
   render();
@@ -567,16 +599,33 @@ function depSelect(a, amt, id) {
   const cur = (S.set.depositMap || {})[a] || '';
   return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + (cur ? [] : [['', 'Not set (counts as checking)']]).concat([['checking', 'Checking or savings'], ['moneyMarket', 'Money market'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']]).map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
 }
+function histSum(k, y, f) { return ((S.set.history || {})[k] || []).filter(r => r.d.slice(0, 4) === String(y) && r[f] != null).reduce((s, r) => s + r[f], 0); }
+function paydaysLeft(next, year, after) { // paydays from `next` through Dec 31, skipping any on or before `after`
+  if (!next) return 0; let n = 0; const d = new Date(next + 'T00:00:00'), end = new Date(year + '-12-31T00:00:00'), cut = after ? new Date(after + 'T00:00:00') : null;
+  while (d <= end) { if (!cut || d > cut) n++; d.setDate(d.getDate() + 14); } return n;
+}
+function contribRec(key) { const c = S.set.contrib || {}; return (c[S.set.year] || {})[key] || {}; }
 function tracker() {
-  const st = S.set, P = st.people, L = st.limits, N = st.paychecks, rows = [];
+  const st = S.set, P = st.people, L = st.limits, N = st.paychecks, y = st.year, rows = [];
   Object.keys(P).forEach(k => {
-    const p = P[k], rem = remaining(p.next, st.year);
-    const proj = (perPay, ytd) => (ytd !== '' && ytd != null && !isNaN(+ytd)) ? +ytd + perPay * rem : perPay * N;
-    rows.push({ k, who: p.label, acct: 'Roth 401(k)', per: p.roth401k, proj: proj(p.roth401k, p.ytd && p.ytd.roth401k), lim: L.k401 });
-    rows.push({ k, who: p.label, acct: 'HSA' + (p.hsaSeed ? ' (with employer seed)' : ''), per: p.hsa, proj: proj(p.hsa, p.ytd && p.ytd.hsa) + (+p.hsaSeed || 0), lim: L.hsa, hsa: 1 });
-    rows.push({ k, who: p.label, acct: 'Roth IRA', per: p.rothIra, proj: proj(p.rothIra, p.ytdRothIra) + (+p.rothIraLump || 0), lim: L.ira, ira: 1 });
+    const p = P[k], rem = remaining(p.next, y), stub = (p.ytd && p.ytd.asOf && +p.ytd.asOf.slice(0, 4) === y) ? p.ytd : null;
+    const defs = [
+      { type: 'k401', acct: 'Roth 401(k)', per: p.roth401k, ytd: stub ? stub.roth401k : null, hf: 'r', lim: L.k401, extra: 0 },
+      { type: 'hsa', acct: 'HSA', per: p.hsa, ytd: stub ? stub.hsa : null, hf: 'h', lim: L.hsa, extra: +p.hsaSeed || 0, hsa: 1 },
+      { type: 'ira', acct: 'Roth IRA', per: p.rothIra, ytd: (p.ytdRothIra !== '' && p.ytdRothIra != null && !isNaN(+p.ytdRothIra)) ? +p.ytdRothIra : null, hf: null, lim: L.ira, extra: +p.rothIraLump || 0, ira: 1 }
+    ];
+    defs.forEach(d => {
+      const key = k + ':' + d.type, cr = contribRec(key), r = { k, key, who: p.label, acct: d.acct, per: d.per, lim: d.lim, hsa: d.hsa, ira: d.ira, done: !!cr.done };
+      if (cr.actual !== undefined && cr.actual !== '' && !isNaN(+cr.actual)) { // what the custodian or plan shows, which already includes seeds and lump sums
+        r.actual = +cr.actual; r.asOf = cr.asOf || ''; r.src = 'actual'; r.proj = r.actual + d.per * paydaysLeft(p.next, y, cr.asOf);
+      } else {
+        const hs = d.hf ? histSum(k, y, d.hf) : 0, base = Math.max(d.ytd == null ? 0 : d.ytd, hs);
+        r.src = d.ytd == null && !hs ? 'estimate' : (hs > (d.ytd || 0) ? 'history' : 'stub');
+        r.proj = (d.ytd == null && !hs ? d.per * N : base + d.per * rem) + d.extra;
+      }
+      r.left = r.lim - r.proj; rows.push(r);
+    });
   });
-  rows.forEach(r => r.left = r.lim - r.proj);
   return rows;
 }
 function header() {
@@ -611,7 +660,7 @@ function overview() {
   const nw = Object.keys(t).reduce((s, k) => s + t[k], 0), ef = t.emergency, months = ns > 0 ? ef / ns : 0;
   const rate = c.gross > 0 ? (c.savedAll + c.employer) / c.gross : 0, full = c.gross > 0 ? (c.savedAll + c.employer + Math.max(0, c.surplus) * 12) / c.gross : 0;
   const verdict = 'We save about ' + pct(rate) + ' of gross income' + (c.surplus > 0 ? ', and about ' + pct(full) + ' if every target holds.' : '.');
-  const next = checklist().filter(x => !S.set.checks[x.id]).slice(0, 3), hk = housekeeping();
+  const next = steps().filter(x => !x.done).slice(0, 3), hk = housekeeping();
   const mths = sn.months, series = mths.map((m, i) => { const tt = typeTotals(i); return Object.keys(tt).reduce((s, k) => s + tt[k], 0); });
   const from = Math.max(0, mths.length - 25), prev = series.length > 1 ? series[series.length - 2] : nw;
   const newAcc = sn.accts.filter(a => acctType(a.n) !== 'ignore' && a.first.slice(0, 7) === latestMonth() && a.bal !== 0 && (a.s.length < 2 || a.s[a.s.length - 2] === 0));
@@ -640,17 +689,12 @@ function plan() {
   const seg = [[c.taxes, 'var(--c6)', 'Taxes'], [c.ded, 'var(--c4)', 'Insurance'], [c.savedAll, 'var(--c1)', 'Saved through payroll'], [c.planned * 12, 'var(--c3)', 'Planned spending'], [Math.max(0, c.surplus * 12), 'var(--c2)', 'Left over']];
   const tr = tracker(), find = (k, a) => tr.find(r => r.k === k && r.acct.indexOf(a) === 0);
   const efGoal = st.monthsTarget * ns, efGap = Math.max(0, efGoal - t.emergency);
-  const items = [
-    { t: 'Emergency fund to ' + st.monthsTarget + ' months of needs', need: efGap, due: '' },
-    { t: 'Sami\u2019s 2026 Roth IRA', need: Math.max(0, find('sami', 'Roth IRA').left), due: '2027-04-15' },
-    { t: 'Chris\u2019s 2026 Roth IRA top-up', need: Math.max(0, find('chris', 'Roth IRA').left), due: '2027-04-15' },
-    { t: 'Sami\u2019s HSA top-off', need: Math.max(0, find('sami', 'HSA').left), due: '2026-12-31' },
-    { t: 'Chris\u2019s HSA top-off', need: Math.max(0, find('chris', 'HSA').left), due: '2026-12-31' }
-  ].filter(x => x.need >= 1);
+  const items = [{ t: 'Emergency fund to ' + st.monthsTarget + ' months of needs', need: efGap, due: '' }]
+    .concat(tr.filter(r => (r.ira || r.hsa) && !r.done).map(r => ({ t: r.who + '\u2019s ' + st.year + ' ' + (r.ira ? 'Roth IRA' + (r.proj > 1 ? ' top-up' : '') : 'HSA top-off'), need: Math.max(0, r.left), due: r.ira ? (st.year + 1) + '-04-15' : st.year + '-12-31' })))
+    .filter(x => x.need >= 1);
   let pool = t.savings; const pool0 = pool;
   items.forEach(x => { x.cov = Math.min(pool, x.need); pool -= x.cov; x.short = x.need - x.cov; });
   const short = items.reduce((s, x) => s + x.short, 0);
-  const done = id => !!st.checks[id];
   return '<h2>Where each dollar goes</h2><p class="lede">From the latest pay stubs, over a full year. Spending is this month\u2019s YNAB targets.</p>' +
     '<div class="split" role="img" aria-label="Share of gross income by use">' + seg.map(s => '<span title="' + s[2] + '" style="width:' + (s[0] / g * 100).toFixed(2) + '%;background:' + s[1] + '"></span>').join('') + '</div>' +
     '<div class="legend">' + seg.map(s => '<span><i style="background:' + s[1] + '"></i>' + s[2] + ' ' + pct(s[0] / g) + '</span>').join('') + '</div>' +
@@ -660,9 +704,10 @@ function plan() {
     '<section class="blk"><h2>Putting cash to work</h2><p class="lede">Priorities in order, paid from the Secondary Money Market (' + fmt(pool0) + ' today).</p><div class="tw"><table class="stmt"><thead><tr><th>Priority</th><th class="num">Needed</th><th class="num">From goals fund</th><th class="num">Still to find</th><th class="num">By</th></tr></thead><tbody>' +
     items.map(x => '<tr><th>' + esc(x.t) + '</th><td class="num">' + fmt(x.need) + '</td><td class="num">' + fmt(x.cov) + '</td><td class="num ' + (x.short > 0 ? 'bad' : '') + '">' + (x.short > 0 ? fmt(x.short) : '\u2014') + '</td><td class="num">' + (x.due ? niceDate(x.due) : 'soon') + '</td></tr>').join('') +
     '<tr class="total"><th>Left in the goals fund after these</th><td></td><td class="num">' + fmt(pool) + '</td><td class="num">' + (short > 0 ? fmt(short) : '') + '</td><td></td></tr></tbody></table></div>' +
-    '<p class="muted" style="font-size:13px">' + (short > 0 ? 'The shortfall can come from the monthly leftover (' + fmt(c.surplus) + '). ' : '') + 'Whatever remains can go to the house or scow fund, extra loan payments, or the brokerage. Roth IRA room assumes the paycheck deposits continue; confirm the 2026 total at Fidelity.</p></section>' +
-    '<section class="blk"><h2>Priorities</h2><p class="lede">Our ranked next steps. Tick them off as you go.</p>' +
-    checklist().map(x => '<label class="chk' + (done(x.id) ? ' done' : '') + '"><input type="checkbox" data-a="check" data-v="' + x.id + '" ' + (done(x.id) ? 'checked' : '') + '><span><span class="t">' + esc(x.t) + '</span>' + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + '</span></label>').join('') + '</section>';
+    '<p class="muted" style="font-size:13px">' + (short > 0 ? 'The shortfall can come from the monthly leftover (' + fmt(c.surplus) + '). ' : '') + 'Whatever remains can go to the house or scow fund, extra loan payments, or the brokerage. Room comes from the Retirement tab: enter actual totals or tick Done there and this list updates.</p></section>' +
+    '<section class="blk"><h2>Priorities for ' + st.year + '</h2><p class="lede">Our ranked next steps. Money steps tick themselves from the numbers; tick the rest as you go, or add your own.</p>' +
+    steps().map(x => '<label class="chk' + (x.done ? ' done' : '') + '"><input type="checkbox" data-a="check" data-v="' + esc(x.key) + '" ' + (x.done ? 'checked' : '') + (x.au && !x.man ? ' disabled' : '') + '><span><span class="t">' + esc(x.t) + '</span>' + (x.au ? '<span class="auto">done, from the numbers</span>' : '') + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + (x.custom ? ' <button class="btn ghost small" data-a="stepdel" data-v="' + esc(x.id) + '" aria-label="Remove step">Remove</button>' : '') + '</span></label>').join('') +
+    '<div class="stepadd"><input id="stept" type="text" placeholder="Add a step, such as Retitle the brokerage as joint" aria-label="New step"><input id="stepd" type="date" aria-label="Due date (optional)"><button class="btn small" data-a="stepadd">Add</button></div></section>';
 }
 
 function retire() {
@@ -672,10 +717,15 @@ function retire() {
   const msg = magi < lo ? 'Under the limit: direct Roth IRA contributions work.' : magi > hi ? 'Over the limit: use the backdoor Roth.' : 'Inside the phase-out range: wait for the W-2s, then decide direct or backdoor.';
   const warns = []; Object.keys(P).forEach(k => { const p = P[k], d = p.roth401k / p.gross * 100; if (d + 0.01 < p.matchNeeds) warns.push(p.label + ' defers ' + d.toFixed(1) + '% but needs ' + p.matchNeeds + '% for the full match.'); });
   const pos = Math.max(0, Math.min(1, (magi - (lo - 20000)) / ((hi + 20000) - (lo - 20000))));
-  return '<h2>' + st.year + ' contribution room</h2><p class="lede">Projected for the full year if every paycheck matches the latest stub. Payroll deductions never show up in YNAB, so these come from the pay stub numbers under Settings.</p>' +
-    '<div class="tw"><table class="stmt"><thead><tr><th>Account</th><th class="num">Per paycheck</th><th class="num">Projected</th><th class="num">Limit</th><th class="num">Room left</th></tr></thead><tbody>' +
-    tr.map(x => '<tr><th>' + esc(x.who) + ' · ' + esc(x.acct) + '</th><td class="num">' + fmt2(x.per) + '</td><td class="num">' + fmt(x.proj) + '</td><td class="num">' + fmt(x.lim) + '</td><td class="num ' + (x.left < -1 ? 'bad' : x.left < 1 ? 'good' : '') + '">' + (x.left < -1 ? 'Over by ' + fmt(-x.left) : fmt(Math.max(0, x.left))) + '</td></tr>').join('') + '</tbody></table></div>' +
-    '<p class="muted" style="font-size:13px">Enter what has really gone into a Roth IRA so far, or lump sums made outside payroll, under Settings on the Update tab.</p>' +
+  const srcTxt = { actual: 'actual', history: 'from paycheck history', stub: 'from latest stub', estimate: 'estimate' };
+  return '<h2>' + st.year + ' contribution room</h2><p class="lede">Projected for the full year: what has gone in so far plus the paychecks left. When you check an account at Fidelity, Optum or your plan, type the year-to-date total into Actual so far. Tick Done once an account is finished for the year.</p>' +
+    '<div class="tw"><table class="stmt contrib"><thead><tr><th>Account</th><th class="num">Per paycheck</th><th class="num">Actual so far</th><th class="num">Projected</th><th class="num">Limit</th><th class="num">Room left</th><th class="num">Done</th></tr></thead><tbody>' +
+    tr.map(x => '<tr' + (x.done ? ' class="muted"' : '') + '><th>' + esc(x.who) + ' · ' + esc(x.acct) + '</th><td class="num">' + fmt2(x.per) + '</td>' +
+      '<td class="num"><input type="number" step="0.01" min="0" placeholder="enter" value="' + (x.actual != null ? x.actual : '') + '" data-a="contrib" data-v="' + x.key + '" data-k="actual" aria-label="' + esc(x.who + ' ' + x.acct) + ' actual so far">' + (x.actual != null ? '<div class="sm">as of <input type="date" value="' + esc(x.asOf) + '" data-a="contrib" data-v="' + x.key + '" data-k="asOf" aria-label="As of date"></div>' : '') + '</td>' +
+      '<td class="num">' + fmt(x.proj) + '<div class="sm">' + srcTxt[x.src] + '</div></td><td class="num">' + fmt(x.lim) + '</td>' +
+      '<td class="num ' + (x.done ? 'good' : x.left < -1 ? 'bad' : x.left < 1 ? 'good' : '') + '">' + (x.done ? 'Done' : x.left < -1 ? 'Over by ' + fmt(-x.left) : fmt(Math.max(0, x.left))) + '</td>' +
+      '<td class="num"><input type="checkbox" data-a="contrib" data-v="' + x.key + '" data-k="done"' + (x.done ? ' checked' : '') + ' aria-label="' + esc(x.who + ' ' + x.acct) + ' done for ' + st.year + '"></td></tr>').join('') + '</tbody></table></div>' +
+    '<p class="muted" style="font-size:13px">Without an actual total, the projection uses the larger of the latest stub’s year-to-date and the sum of this year’s checks in your paycheck history, then adds the employer HSA seed and Roth IRA money put in outside payroll (Settings). An actual total already includes those. Done items drop out of the plan and the flags.</p>' +
     (warns.length ? '<ul class="alerts">' + warns.map(w => '<li><span class="mk bad"></span><span>' + esc(w) + '</span><span></span></li>').join('') + '</ul>' : '<ul class="alerts"><li><span class="mk ok"></span><span>Both of you earn the full employer match.</span><span></span></li></ul>') +
     '<section class="blk two"><div><h2>Roth IRA income check</h2><div class="kpis"><div class="kpi"><div class="v">' + fmt(magi) + '</div><div class="l">estimated MAGI, ' + st.year + '</div></div></div>' +
     '<div class="track" style="margin:14px 0 6px"><div class="fill" style="width:' + (pos * 100).toFixed(1) + '%;background:' + (magi < lo ? 'var(--good)' : magi > hi ? 'var(--bad)' : 'var(--warn)') + '"></div></div><div class="legend"><span>' + fmt(lo - 20000) + '</span><span>phase-out ' + fmt(lo) + ' to ' + fmt(hi) + '</span><span>' + fmt(hi + 20000) + '</span></div>' +
@@ -761,7 +811,7 @@ function update() {
     '<details><summary>Account types</summary><p class="muted" style="font-size:13px">Decides which bucket each YNAB account lands in. New accounts are sorted by name; change one here if it\u2019s wrong.</p><div class="tw"><table class="stmt"><thead><tr><th>Account</th><th class="num">Balance</th><th class="num">Last activity</th><th class="num">Type</th></tr></thead><tbody>' + accts + '</tbody></table></div></details>' +
     '<details><summary>What counts as a need</summary><p class="muted" style="font-size:13px">Drives the cash cushion. Needs are summed from this month\u2019s targets.</p><div style="columns:2 240px">' + needList.map(c => '<label style="display:block;break-inside:avoid"><input type="checkbox" data-a="need" data-v="' + esc(c) + '" ' + (nset.has(c) ? 'checked' : '') + '> ' + esc(c) + '</label>').join('') + '</div><div class="fld" style="margin-top:12px"><label for="mt">Emergency fund target, months of needs</label><input id="mt" type="number" step="1" min="1" value="' + st.monthsTarget + '" data-a="mt"></div></details>' +
     '<details><summary>Paychecks and contribution limits</summary><p class="muted" style="font-size:13px">From your latest pay stubs. Update when pay or deferrals change.</p>' + people +
-    '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">If Sami leaves her job</h3><div class="fld"><label for="rw2">Added monthly costs (health coverage and the like)</label><input id="rw2" type="number" step="10" value="' + (st.runway.addedSami || 0) + '" data-a="rw2"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
+    '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">If Sami leaves her job</h3><div class="fld"><label for="rw2">Added monthly costs (health coverage and the like)</label><input id="rw2" type="number" step="10" value="' + (st.runway.addedSami || 0) + '" data-a="rw2"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="py">Plan year</label><input id="py" type="number" step="1" value="' + st.year + '" data-a="py"></div><div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
     '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
 }
 
@@ -782,6 +832,7 @@ function flags() {
     else add('ok', 'The emergency fund covers ' + mo.toFixed(1) + ' months of needs, above the ' + tgt + '-month target.');
   }
   tracker().forEach(r => {
+    if (r.done) return;
     const rem = remaining(P[r.k].next, st.year);
     if (r.left < -1) add('bad', r.who + ' is on track to put ' + fmt(-r.left) + ' too much into the ' + r.acct + ' for ' + st.year + '. Excess contributions carry a 6% yearly tax until fixed.');
     else if (r.left > 1 && r.hsa) add('warn', r.who + '’s HSA has ' + fmt(r.left) + ' of room left for ' + st.year + (rem ? ', about ' + fmt(r.left / rem) + ' more per remaining paycheck, or a one-time deposit before Dec 31' : '') + '.');
@@ -796,7 +847,8 @@ function flags() {
   const over = sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[curIdx()] < -1).sort((a, b) => a.v[curIdx()] - b.v[curIdx()]).slice(0, 3);
   if (over.length) add('warn', 'Overspent this month: ' + over.map(x => x.c + ' (' + fmt(-x.v[curIdx()]) + ')').join(', ') + '. Cover it in YNAB or move money.');
   Object.keys(P).forEach(k => { const m = payModel(k), lr = m.rows.slice().reverse().find(r => r.base && !r.partial); if (lr && P[k].gross && Math.abs(lr.base - P[k].gross) > 1) add('warn', P[k].label + '’s latest pay stub shows ' + fmt2(lr.base) + ' per paycheck but the app has ' + fmt2(P[k].gross) + '. Apply the stub on the Update tab.'); });
-  checklist().filter(x => !st.checks[x.id] && x.due && daysBetween(todayIso(), x.due) <= 60).forEach(x => add(daysBetween(todayIso(), x.due) < 0 ? 'bad' : 'warn', x.t + ' (due ' + niceDate(x.due) + ').'));
+  steps().filter(x => !x.done && x.due && daysBetween(todayIso(), x.due) <= 60).forEach(x => add(daysBetween(todayIso(), x.due) < 0 ? 'bad' : 'warn', x.t + ' (due ' + niceDate(x.due) + ').'));
+  const ty = +todayIso().slice(0, 4); if (ty > st.year) add('info', 'It\u2019s ' + ty + ' and the plan year is still ' + st.year + '. Once the ' + st.year + ' steps are done (Roth IRAs by Apr 15), switch the plan year under Settings and update the limits.');
   const st2 = stale(); if (st2.length) add('warn', st2.length + ' account(s) haven’t been reconciled recently: ' + st2.slice(0, 3).map(a => a.n).join(', ') + '.');
   const order = { bad: 0, warn: 1, info: 2, ok: 3 };
   return out.sort((a, b) => order[a.l] - order[b.l]);
@@ -819,10 +871,10 @@ function insightContext() {
     emergencyFundMonthsOfNeeds: ns ? +(t.emergency / ns).toFixed(1) : null, targetMonths: st.monthsTarget, monthlyNeeds: r1(ns), monthlyPlannedSpending: r1(c.planned), monthlyLeftOver: r1(c.surplus),
     annualGross: r1(c.gross), annualSavedThroughPayrollAndBrokerage: r1(c.savedAll), rothIraOutsidePayroll: r1(c.sv.lump), savingsRateOfGrossWithEmployer: c.gross > 0 ? +((c.savedAll + c.employer) / c.gross * 100).toFixed(1) : null, annualEmployerMoney: r1(c.employer), estimatedMAGI: r1(magiNow()), rothIraPhaseOut: [st.limits.roLo, st.limits.roHi],
     paychecksPerYear: st.paychecks, people,
-    contributionRoom: tracker().map(r => ({ who: r.who, account: r.acct, projectedYear: r1(r.proj), limit: r.lim, roomLeft: r1(r.left) })),
+    contributionRoom: tracker().map(r => ({ who: r.who, account: r.acct, projectedYear: r1(r.proj), limit: r.lim, roomLeft: r1(r.left), doneForYear: r.done, basis: r.src, actualSoFar: r.actual != null ? r.actual : null, actualAsOf: r.asOf || null })),
     overspentThisMonth: sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[i] < -1).map(x => ({ category: x.c, over: r1(-x.v[i]) })).slice(0, 8),
     loans: loanList().map(l => ({ loan: l.name, balance: r1(l.bal), ratePct: l.rate, minPayment: r1(l.min) })),
-    runway: run, openChecklist: checklist().filter(x => !st.checks[x.id]).map(x => ({ task: x.t, due: x.due || null })),
+    runway: run, planYear: st.year, openChecklist: steps().filter(x => !x.done).map(x => ({ task: x.t, due: x.due || null })), doneChecklist: steps().filter(x => x.done).map(x => x.t),
     appFlags: flags().filter(f => f.l !== 'ok').map(f => f.t)
   };
 }
@@ -942,7 +994,53 @@ function pay() {
     lp += '<div><h3>' + esc(P[k].label) + ', ' + niceDate(l.d) + '</h3><table class="stmt"><tbody>' + rows.map(r => '<tr><th>' + r[0] + '</th><td class="num">' + fmt2(r[1]) + '</td></tr>').join('') + (l.i ? '<tr class="sub"><th>Taxable benefits that never reach you</th><td class="num">' + fmt2(-l.i) + '</td></tr>' : '') + '<tr class="total"><th>Take-home</th><td class="num">' + fmt2(l.n) + '</td></tr></tbody></table>' + (l.m ? '<p class="muted" style="font-size:13px">Employer 401(k) match on this check: ' + fmt2(l.m) + '.</p>' : '') + '</div>';
   });
   if (lp) out += '<section class="blk"><h3>Most recent checks</h3><div class="two">' + lp + '</div></section>';
-  return out + '<section class="blk">' + hist + '</section>';
+  return out + ledger() + '<section class="blk">' + hist + '</section>';
+}
+
+/* ---------- paycheck ledger: every check kept, exportable ---------- */
+const CSV_COLS = [['person', null], ['date', 'd'], ['gross', 'g'], ['take_home', 'n'], ['regular_pay', 'b'], ['taxes', 't'], ['roth_401k', 'r'], ['hsa', 'h'], ['other_deductions', 'o'], ['imputed_income', 'i'], ['employer_match', 'm'], ['source', 'k']];
+function ledger() {
+  const st = S.set, P = st.people, H = st.history || {}, cell = v => v == null ? '<td class="num muted">\u2014</td>' : '<td class="num">' + fmt2(v) + '</td>';
+  const total = Object.keys(P).reduce((s, k) => s + (H[k] || []).length, 0);
+  let h = '<section class="blk"><h2>Every paycheck</h2><p class="lede">' + total + ' checks on file. Every stub you apply and every check you paste is kept here, and the totals feed the year-to-date contributions on the Retirement tab. Download the file now and then and keep it with your records; importing it on any device restores the history.</p>' +
+    '<div class="tools"><button class="btn small" data-a="histcsv">Download all paychecks (CSV)</button><label class="btn ghost small" style="cursor:pointer">Import a paycheck CSV<input type="file" accept=".csv,text/csv" data-a="histimport" style="display:none"></label></div>' +
+    '<p class="muted" style="font-size:13px">To fill in older years, download past statements from Paylocity and Workday as PDFs and drop them all at once on the Update tab, then apply each person\u2019s stubs. Older checks without stub detail show a dash.</p>';
+  Object.keys(P).forEach(k => {
+    const rows = (H[k] || []).slice().sort((a, b) => (a.d < b.d ? 1 : -1)); if (!rows.length) return;
+    const years = Array.from(new Set(rows.map(r => r.d.slice(0, 4))));
+    h += '<h3 style="margin-top:16px">' + esc(P[k].label) + '</h3>';
+    years.forEach(y => {
+      const ry = rows.filter(r => r.d.slice(0, 4) === y), sum = f => ry.reduce((s, r) => s + (r[f] || 0), 0), has = f => ry.some(r => r[f] != null);
+      h += '<details' + (+y === st.year ? ' open' : '') + '><summary>' + y + ' \u00b7 ' + ry.length + (ry.length === 1 ? ' check' : ' checks') + ' \u00b7 ' + fmt(sum('g')) + ' gross</summary><div class="tw"><table class="stmt ptab"><thead><tr><th>Date</th><th class="num">Gross</th><th class="num">Taxes</th><th class="num">Roth 401(k)</th><th class="num">HSA</th><th class="num">Other</th><th class="num">Take-home</th><th class="src">Source</th><th></th></tr></thead><tbody>' +
+        ry.map(r => '<tr><th>' + niceDate(r.d) + '</th><td class="num">' + fmt2(r.g) + '</td>' + cell(r.t) + cell(r.r) + cell(r.h) + cell(r.o) + '<td class="num">' + fmt2(r.n) + '</td><td class="sm src">' + esc(r.k || 'pasted') + '</td><td><button class="btn ghost small del" data-a="histdel" data-v="' + k + '|' + r.d + '|' + r.n + '" aria-label="Delete the ' + esc(niceDate(r.d)) + ' check">Delete</button></td></tr>').join('') +
+        '<tr class="total"><th>Total</th><td class="num">' + fmt2(sum('g')) + '</td>' + (has('t') ? '<td class="num">' + fmt2(sum('t')) + '</td>' : '<td></td>') + (has('r') ? '<td class="num">' + fmt2(sum('r')) + '</td>' : '<td></td>') + (has('h') ? '<td class="num">' + fmt2(sum('h')) + '</td>' : '<td></td>') + (has('o') ? '<td class="num">' + fmt2(sum('o')) + '</td>' : '<td></td>') + '<td class="num">' + fmt2(sum('n')) + '</td><td></td><td></td></tr></tbody></table></div></details>';
+    });
+  });
+  return h + '</section>';
+}
+function histToCsv() {
+  const st = S.set, q = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const lines = [CSV_COLS.map(c => c[0]).join(',')];
+  Object.keys(st.people).forEach(k => ((st.history || {})[k] || []).forEach(r => lines.push(CSV_COLS.map(c => q(c[1] ? r[c[1]] : st.people[k].label)).join(','))));
+  return lines.join('\n') + '\n';
+}
+function csvToHist(text) { // returns { who: [records] }
+  const rows = []; let row = [], f = '', qd = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (qd) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else qd = false; } else f += ch; }
+    else if (ch === '"') qd = true; else if (ch === ',') { row.push(f); f = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; } else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  const hd = (rows.shift() || []).map(x => x.trim().toLowerCase()), out = {}, P = S.set.people;
+  rows.forEach(c => {
+    if (c.length < 3) return; const get = n => { const i = hd.indexOf(n); return i < 0 ? '' : (c[i] || '').trim(); };
+    const nm = get('person').toLowerCase(), who = Object.keys(P).find(k => k === nm || P[k].label.toLowerCase() === nm); if (!who) return;
+    const r = {}; CSV_COLS.forEach(col => { if (!col[1]) return; const v = get(col[0]); if (v === '') return; r[col[1]] = (col[1] === 'd' || col[1] === 'k') ? v : Math.round(parseFloat(v.replace(/[$,]/g, '')) * 100) / 100; });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.d || '') || !(r.g > 0) || isNaN(r.n)) return;
+    (out[who] = out[who] || []).push(r);
+  });
+  return out;
 }
 
 /* ---------- pay stubs ---------- */
@@ -1170,6 +1268,14 @@ document.addEventListener('click', async ev => {
   else if (a === 'ignore') { S.set.acctType[v] = 'ignore'; saveSettings(); render(); }
   else if (a === 'reset') { S.set = defaults(); saveSettings(); S.msg = { t: 'Settings reset to defaults.' }; render(); }
   else if (a === 'stubapply') { payApply(+v); }
+  else if (a === 'histcsv') {
+    try { const blob = new Blob([histToCsv()], { type: 'text/csv' }), url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = 'paychecks-' + todayIso() + '.csv'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
+    catch (e) { S.msg = { err: true, t: 'Could not save the paycheck file.' }; render(); } }
+  else if (a === 'histdel') {
+    const parts = v.split('|'), who = parts[0], d = parts[1], n = +parts[2], H = (S.set.history || {})[who] || [];
+    if (window.confirm('Delete the ' + niceDate(d) + ' check from ' + S.set.people[who].label + '\u2019s pay history?')) { S.set.history[who] = H.filter(r => !(r.d === d && Math.abs(r.n - n) < 0.005)); saveSettings(); render(); } }
+  else if (a === 'stepadd') { const t = (document.getElementById('stept').value || '').trim(), d = document.getElementById('stepd').value; if (t) { S.set.steps = S.set.steps || []; S.set.steps.push({ id: 'c' + Date.now(), t, due: d || undefined, year: S.set.year }); saveSettings(); } render(); }
+  else if (a === 'stepdel') { S.set.steps = (S.set.steps || []).filter(x => x.id !== v); delete S.set.checks[v]; saveSettings(); render(); }
   else if (a === 'runwho') { S.runWho = v; render(); }
   else if (a === 'aicopy') { const ta = document.getElementById('aictx'); try { await navigator.clipboard.writeText(ta.value); S.msg = { t: 'Summary copied.' }; } catch (e) { ta.focus(); ta.select(); S.msg = { t: 'Select and copy the text above.' }; } render(); }
   else if (a === 'histadd') {
@@ -1195,6 +1301,12 @@ document.addEventListener('change', ev => {
   const el = ev.target; if (!el.dataset || !el.dataset.a) return;
   const a = el.dataset.a, v = el.dataset.v, st = S.set;
   if (a === 'stubfile') { if (el.files && el.files.length) importStubs(Array.from(el.files)); }
+  else if (a === 'histimport') {
+    const f = el.files && el.files[0]; if (!f) return;
+    f.text().then(txt => { const got = csvToHist(txt); let added = 0; st.history = st.history || {};
+      Object.keys(got).forEach(w => { const b = (st.history[w] || []).length; st.history[w] = window.PayStubs.mergeHistory(st.history[w], got[w]); added += st.history[w].length - b; });
+      saveSettings(); S.msg = { t: added ? 'Added ' + added + ' check(s) from the file. Checks already on file were skipped.' : 'No new checks in that file.' }; render(); })
+      .catch(() => { S.msg = { err: true, t: 'Could not read that file.' }; render(); }); }
   else if (a === 'stubwho') { P2.who = P2.who || {}; P2.who[v] = el.value; render(); }
   else if (a === 'stubdep' && el.value) { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; Object.keys(st.people).forEach(w => { if (depAccts(w).some(x => x.last4 === v)) rederiveDeposits(w); }); saveSettings(); render(); }
   else if (a === 'restore') { restoreFile(el.files && el.files[0]); }
@@ -1202,6 +1314,13 @@ document.addEventListener('change', ev => {
   else if (a === 'month') { S.month = el.value; S.openCat = null; render(); }
   else if (a === 'wed') { S.exclWedding = el.checked; render(); }
   else if (a === 'check') { st.checks[v] = el.checked; saveSettings(); render(); }
+  else if (a === 'contrib') {
+    const k = el.dataset.k; st.contrib = st.contrib || {}; const yr = st.contrib[st.year] = st.contrib[st.year] || {}, rec = yr[v] = yr[v] || {};
+    if (k === 'done') rec.done = el.checked;
+    else if (k === 'asOf') rec.asOf = el.value;
+    else { rec.actual = el.value === '' ? '' : Math.max(0, +el.value || 0); if (rec.actual !== '' && !rec.asOf) rec.asOf = todayIso(); }
+    saveSettings(); render(); }
+  else if (a === 'py') { const y = Math.round(+el.value); if (y >= 2000 && y <= 2100) { st.year = y; saveSettings(); S.msg = { t: 'Plan year set to ' + y + '. Check the limits and paychecks per year below.' }; } render(); }
   else if (a === 'extra') { S.extra = Math.max(0, +el.value || 0); render(); }
   else if (a === 'strategy') { S.strategy = el.value; render(); }
   else if (a === 'rate') { st.loanRates[v] = Math.max(0, +el.value || 0); saveSettings(); render(); }
