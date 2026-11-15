@@ -377,10 +377,12 @@ function baseSteps(y) { // the standing plan; annual steps are re-created for ea
     { id: 'rates', t: 'Verify student loan rates with your servicer', n: 'Rates are entered on the Loans tab.', once: 1 }
   ];
 }
+const SOON_DAYS = 45;
 function checklist() { // legacy override list, else the standing plan, plus steps you added for this year
   const st = S.set, y = st.year;
   const base = (Array.isArray(st.checklist) && st.checklist.length) ? st.checklist : baseSteps(y);
-  return base.concat((st.steps || []).filter(x => !x.year || x.year === y).map(x => Object.assign({ custom: 1 }, x)));
+  const soon = x => x.year > y && x.due && daysBetween(todayIso(), x.due) <= SOON_DAYS; // next year's steps surface when they come due
+  return base.concat((st.steps || []).filter(x => !x.year || x.year === y || soon(x)).map(x => Object.assign({ custom: 1 }, x, x.year > y ? { t: x.t + ' (' + x.year + ' plan)' } : {})));
 }
 function stepKey(x) { return x.once || x.custom ? x.id : S.set.year + ':' + x.id; }
 function autoDone(kind) {
@@ -711,12 +713,12 @@ function plan() {
     '<details style="margin-top:12px"><summary>Paste steps from Claude</summary><p class="muted" style="font-size:13px">One step per line: <i>year | due date or - | step | note (optional)</i>, such as <i>2027 | 2027-04-15 | Recharacterize and convert Chris\u2019s 2026 Roth IRA | Call Fidelity</i>. Steps already on the list are skipped.</p><textarea id="stepbulk" rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:inherit" aria-label="Steps to add"></textarea><div class="tools"><button class="btn small" data-a="stepimport">Add these steps</button></div></details></section>';
 }
 function upcoming() { // steps saved for later plan years, so next year's work is visible now
-  const st = S.set, later = (st.steps || []).filter(x => x.year && x.year > st.year).sort((a, b) => (a.year - b.year) || ((a.due || '9') < (b.due || '9') ? -1 : 1));
+  const st = S.set, later = (st.steps || []).filter(x => x.year && x.year > st.year && !(x.due && daysBetween(todayIso(), x.due) <= SOON_DAYS)).sort((a, b) => (a.year - b.year) || ((a.due || '9') < (b.due || '9') ? -1 : 1));
   if (!later.length) return '';
   const yrs = Array.from(new Set(later.map(x => x.year)));
-  return yrs.map(y => '<details style="margin-top:12px"><summary>Coming up in ' + y + ' \u00b7 ' + later.filter(x => x.year === y).length + ' steps</summary>' +
+  return yrs.map(y => '<details style="margin-top:12px"><summary>Coming up in ' + y + ' \u00b7 ' + later.filter(x => x.year === y).length + (later.filter(x => x.year === y).length === 1 ? ' step' : ' steps') + '</summary>' +
     later.filter(x => x.year === y).map(x => '<div class="chk"><span></span><span><span class="t">' + esc(x.t) + '</span>' + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + ' <button class="btn ghost small" data-a="stepdel" data-v="' + esc(x.id) + '" aria-label="Remove step">Remove</button></span></div>').join('') +
-    '<p class="muted" style="font-size:13px">These move into Priorities when the plan year (Settings) is set to ' + y + '.</p></details>').join('');
+    '<p class="muted" style="font-size:13px">Each step moves up into Priorities ' + SOON_DAYS + ' days before it\u2019s due, or when the plan year (Settings) is set to ' + y + '.</p></details>').join('');
 }
 function parseSteps(text, defYear) {
   const out = [];
