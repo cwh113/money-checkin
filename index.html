@@ -564,8 +564,8 @@ function rederiveDeposits(w) { // re-split brokerage and Roth IRA from the store
   p.rothIra = Math.round(ira * 100) / 100; p.brokerage = Math.round(brk * 100) / 100;
 }
 function depSelect(a, amt, id) {
-  const cur = (S.set.depositMap || {})[a] || 'checking';
-  return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + [['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']].map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
+  const cur = (S.set.depositMap || {})[a] || '';
+  return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + (cur ? [] : [['', 'Not set (counts as checking)']]).concat([['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']]).map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
 }
 function tracker() {
   const st = S.set, P = st.people, L = st.limits, N = st.paychecks, rows = [];
@@ -1196,7 +1196,7 @@ document.addEventListener('change', ev => {
   const a = el.dataset.a, v = el.dataset.v, st = S.set;
   if (a === 'stubfile') { if (el.files && el.files.length) importStubs(Array.from(el.files)); }
   else if (a === 'stubwho') { P2.who = P2.who || {}; P2.who[v] = el.value; render(); }
-  else if (a === 'stubdep') { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; Object.keys(st.people).forEach(w => { if (depAccts(w).some(x => x.last4 === v)) rederiveDeposits(w); }); saveSettings(); render(); }
+  else if (a === 'stubdep' && el.value) { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; Object.keys(st.people).forEach(w => { if (depAccts(w).some(x => x.last4 === v)) rederiveDeposits(w); }); saveSettings(); render(); }
   else if (a === 'restore') { restoreFile(el.files && el.files[0]); }
   else if (a === 'ynabbudget') { tokBudgetSet(el.value); render(); }
   else if (a === 'month') { S.month = el.value; S.openCat = null; render(); }
