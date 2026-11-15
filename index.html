@@ -422,11 +422,12 @@ function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.par
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 async function saveSnap() {
   if (S.mode === 'db') await S.db.doc('fin/snapshot').set(S.snap); else lsSet('fin.snapshot', S.snap);
+  syncDirty();
 }
 function saveSettings() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    try { if (S.mode === 'db') await S.db.doc('fin/settings').set(S.set); else lsSet('fin.settings', S.set); }
+    try { if (S.mode === 'db') await S.db.doc('fin/settings').set(S.set); else lsSet('fin.settings', S.set); syncDirty(); }
     catch (e) { S.msg = { err: true, t: 'Could not save settings: ' + (e && e.message || e) }; render(); }
   }, 500);
 }
@@ -443,6 +444,119 @@ function applyDoc(kind, data) {
 async function boot() {
   S.mode = 'local';
   applyDoc('set', lsGet('fin.settings')); applyDoc('snap', lsGet('fin.snapshot'));
+  if (syncCfg()) syncPull({});
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && syncCfg() && Date.now() - (S.syncPulledAt || 0) > 20000) syncPull({}); });
+}
+
+/* ---------- device sync: one encrypted file in a secret GitHub Gist ----------
+   The data is encrypted in this browser (PBKDF2-SHA256 key from your passphrase, AES-256-GCM)
+   before it is sent, so GitHub only ever stores ciphertext. Tokens are never included. */
+const SYNC_FILE = 'money-checkin.enc.json', SYNC_DESC = 'Money check-in sync (encrypted)', GH = 'https://api.github.com';
+function syncCfg() { const c = lsGet('fin.sync'); return c && c.token && c.pass && c.gistId ? c : null; }
+function syncCfgSet(c) { if (c) lsSet('fin.sync', c); else { try { localStorage.removeItem('fin.sync'); } catch (e) { } } }
+const b64e = u8 => { let s = ''; u8.forEach(b => { s += String.fromCharCode(b); }); return btoa(s); };
+const b64d = t => Uint8Array.from(atob(t), ch => ch.charCodeAt(0));
+async function syncKey(pass, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function syncEncrypt(obj, pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await syncKey(pass, salt), new TextEncoder().encode(JSON.stringify(obj))));
+  return JSON.stringify({ v: 1, alg: 'PBKDF2-SHA256-310000/AES-256-GCM', salt: b64e(salt), iv: b64e(iv), ct: b64e(ct) });
+}
+async function syncDecrypt(text, pass) {
+  let o; try { o = JSON.parse(text); } catch (e) { throw new Error('The synced file is damaged.'); }
+  try { const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(o.iv) }, await syncKey(pass, b64d(o.salt)), b64d(o.ct)); return JSON.parse(new TextDecoder().decode(pt)); }
+  catch (e) { throw new Error('That passphrase doesn\u2019t match the synced data.'); }
+}
+async function gh(token, path, opt) {
+  const r = await fetch(GH + path, Object.assign({}, opt, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' } }));
+  if (r.status === 401) throw new Error('GitHub didn\u2019t accept that token. Check it hasn\u2019t expired and has Gists read and write access.');
+  if (r.status === 403 || r.status === 404) throw new Error('GitHub refused the request (' + r.status + '). Check the token has Gists read and write access.');
+  if (!r.ok) throw new Error('GitHub error ' + r.status + '.');
+  return r.json();
+}
+async function syncFind(token) { // the gist that holds our file, if any
+  for (let page = 1; page <= 10; page++) {
+    const list = await gh(token, '/gists?per_page=100&page=' + page);
+    const g = list.find(x => x.files && x.files[SYNC_FILE]); if (g) return g.id;
+    if (list.length < 100) return null;
+  }
+  return null;
+}
+async function syncRead(cfg) {
+  const g = await gh(cfg.token, '/gists/' + cfg.gistId), f = g.files && g.files[SYNC_FILE];
+  if (!f) throw new Error('The sync file is missing from the gist.');
+  const text = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+  return syncDecrypt(text, cfg.pass);
+}
+async function syncPush() {
+  const cfg = syncCfg(); if (!cfg) return;
+  const at = Date.now(), content = await syncEncrypt({ updatedAt: at, settings: S.set, snapshot: S.snap }, cfg.pass);
+  await gh(cfg.token, '/gists/' + cfg.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [SYNC_FILE]: { content } } }) });
+  const c = syncCfg(); if (c) { c.lastSynced = at; if ((c.dirtyAt || 0) <= at) c.dirtyAt = 0; syncCfgSet(c); }
+}
+function syncApply(remote) {
+  if (remote.settings) { applyDoc('set', remote.settings); lsSet('fin.settings', S.set); }
+  if (remote.snapshot !== undefined) { applyDoc('snap', remote.snapshot); if (S.snap) lsSet('fin.snapshot', S.snap); }
+}
+async function syncRun(fn) { // one sync at a time; show status on the Update tab
+  if (S.syncBusy) return S.syncBusy;
+  S.syncBusy = (async () => { try { await fn(); S.syncErr = ''; } catch (e) { S.syncErr = (e && e.message) || String(e); } finally { S.syncBusy = null; if (S.tab === 'update') render(); } })();
+  return S.syncBusy;
+}
+function syncPull(opt) {
+  return syncRun(async () => {
+    const cfg = syncCfg(); if (!cfg) return;
+    const remote = await syncRead(cfg); S.syncPulledAt = Date.now();
+    const remoteAt = remote.updatedAt || 0, dirty = cfg.dirtyAt || 0;
+    if (opt.force || (remoteAt > (cfg.lastSynced || 0) && dirty <= remoteAt)) { syncApply(remote); const c = syncCfg(); c.lastSynced = remoteAt; c.dirtyAt = 0; syncCfgSet(c); render(); }
+    else if (dirty > (cfg.lastSynced || 0)) await syncPushNow();
+  });
+}
+async function syncPushNow() { await syncPush(); }
+let syncTimer = null;
+function syncDirty() {
+  const c = syncCfg(); if (!c) return;
+  c.dirtyAt = Date.now(); syncCfgSet(c);
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => syncRun(syncPush), 2500);
+}
+async function syncConnect(mode) { // mode 'up': this device has the latest; 'down': take what's synced
+  const token = (document.getElementById('sync-token').value || '').trim(), pass = document.getElementById('sync-pass').value || '';
+  if (!token || pass.length < 12) { S.syncErr = 'Enter the GitHub token and a passphrase of at least 12 characters.'; render(); return; }
+  await syncRun(async () => {
+    let id = await syncFind(token);
+    if (mode === 'down') {
+      if (!id) throw new Error('No synced data found yet. On the device with your latest data, choose Upload first.');
+      const cfg = { token, pass, gistId: id };
+      const remote = await syncRead(cfg);
+      syncCfgSet(Object.assign(cfg, { lastSynced: remote.updatedAt || Date.now(), dirtyAt: 0 })); syncApply(remote);
+      S.msg = { t: 'Sync is on. This device now has the synced data.' };
+    } else {
+      const at = Date.now(), content = await syncEncrypt({ updatedAt: at, settings: S.set, snapshot: S.snap }, pass);
+      if (id) await gh(token, '/gists/' + id, { method: 'PATCH', body: JSON.stringify({ files: { [SYNC_FILE]: { content } } }) });
+      else id = (await gh(token, '/gists', { method: 'POST', body: JSON.stringify({ description: SYNC_DESC, public: false, files: { [SYNC_FILE]: { content } } }) })).id;
+      syncCfgSet({ token, pass, gistId: id, lastSynced: at, dirtyAt: 0 });
+      S.msg = { t: 'Sync is on. This device\u2019s data is uploaded; on your other device choose Download.' };
+    }
+  });
+}
+function syncBlock() {
+  const c = syncCfg(), when = c && c.lastSynced ? new Date(c.lastSynced).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  let h = '<details' + (S.syncErr ? ' open' : '') + '><summary>Sync between devices' + (c ? ' \u00b7 on' : '') + '</summary>';
+  if (c) {
+    h += '<p class="muted" style="font-size:13px">' + (S.syncBusy ? 'Syncing\u2026' : 'On. Last synced ' + esc(when) + '.') + ' Changes upload a few seconds after you make them, and the latest copy downloads whenever you open the app. Data is encrypted with your passphrase before it leaves this device.</p>' +
+      '<div class="tools"><button class="btn small" data-a="syncnow">Sync now</button><button class="btn ghost small" data-a="syncoff">Turn off on this device</button></div>';
+  } else {
+    h += '<p class="muted" style="font-size:13px">Keeps your phone and laptop in step through one encrypted file in a secret GitHub Gist, using your free GitHub account. The data is encrypted in this browser with your passphrase before it is sent, so GitHub only stores scrambled text. Your YNAB and GitHub tokens are never included.</p>' +
+      '<ol class="steps"><li>On github.com: Settings \u2192 Developer settings \u2192 Personal access tokens \u2192 Fine-grained tokens \u2192 Generate new token. Repository access: none. Account permissions: Gists, read and write. Pick an expiration, such as one year.</li><li>Choose a passphrase you will both use on every device, at least 12 characters (four random words works well). If it is lost, the synced copy can\u2019t be read; upload again from a device.</li><li>On the device with your latest data choose Upload. On the other device enter the same token and passphrase and choose Download.</li></ol>' +
+      '<div class="fld"><label for="sync-token">GitHub token (Gists read and write)</label><input id="sync-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></div>' +
+      '<div class="fld"><label for="sync-pass">Sync passphrase</label><input id="sync-pass" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false"></div>' +
+      '<div class="tools"><button class="btn small" data-a="syncup">Upload: this device has the latest</button><button class="btn ghost small" data-a="syncdown">Download: take the synced data</button></div>';
+  }
+  if (S.syncErr) h += '<p class="bad" style="font-size:13px">' + esc(S.syncErr) + '</p>';
+  return h + '</details>';
 }
 
 /* ---------- model helpers ---------- */
@@ -837,7 +951,7 @@ function update() {
     '<details><summary>What counts as a need</summary><p class="muted" style="font-size:13px">Drives the cash cushion. Needs are summed from this month\u2019s targets.</p><div style="columns:2 240px">' + needList.map(c => '<label style="display:block;break-inside:avoid"><input type="checkbox" data-a="need" data-v="' + esc(c) + '" ' + (nset.has(c) ? 'checked' : '') + '> ' + esc(c) + '</label>').join('') + '</div><div class="fld" style="margin-top:12px"><label for="mt">Emergency fund target, months of needs</label><input id="mt" type="number" step="1" min="1" value="' + st.monthsTarget + '" data-a="mt"></div></details>' +
     '<details><summary>Paychecks and contribution limits</summary><p class="muted" style="font-size:13px">From your latest pay stubs. Update when pay or deferrals change.</p>' + people +
     '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">If Sami leaves her job</h3><div class="fld"><label for="rw2">Added monthly costs (health coverage and the like)</label><input id="rw2" type="number" step="10" value="' + (st.runway.addedSami || 0) + '" data-a="rw2"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="py">Plan year</label><input id="py" type="number" step="1" value="' + st.year + '" data-a="py"></div><div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
-    '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
+    syncBlock() + '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
 }
 
 
@@ -1300,6 +1414,9 @@ document.addEventListener('click', async ev => {
     const parts = v.split('|'), who = parts[0], d = parts[1], n = +parts[2], H = (S.set.history || {})[who] || [];
     if (window.confirm('Delete the ' + niceDate(d) + ' check from ' + S.set.people[who].label + '\u2019s pay history?')) { S.set.history[who] = H.filter(r => !(r.d === d && Math.abs(r.n - n) < 0.005)); saveSettings(); render(); } }
   else if (a === 'stepadd') { const t = (document.getElementById('stept').value || '').trim(), d = document.getElementById('stepd').value; if (t) { S.set.steps = S.set.steps || []; S.set.steps.push({ id: 'c' + Date.now(), t, due: d || undefined, year: S.set.year }); saveSettings(); } render(); }
+  else if (a === 'syncup' || a === 'syncdown') { syncConnect(a === 'syncup' ? 'up' : 'down'); }
+  else if (a === 'syncnow') { syncPull({}); render(); }
+  else if (a === 'syncoff') { syncCfgSet(null); S.syncErr = ''; S.msg = { t: 'Sync is off on this device. Its data stays here, and the synced copy stays in your gist.' }; render(); }
   else if (a === 'stepimport') {
     const st = S.set, got = parseSteps(document.getElementById('stepbulk').value || '', st.year); st.steps = st.steps || [];
     let added = 0; got.forEach((x, i) => { if (!st.steps.some(y => y.year === x.year && y.t.toLowerCase() === x.t.toLowerCase())) { st.steps.push(Object.assign({ id: 'c' + Date.now() + '_' + i }, x)); added++; } });
