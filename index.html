@@ -545,10 +545,27 @@ function calc() {
     gross += g; taxes += t; ded += d; employer += emp; toChecking += chk;
     sv.roth401k += p.roth401k * N; sv.hsa += p.hsa * N; sv.rothIra += p.rothIra * N; sv.brokerage += p.brokerage * N;
   });
-  const savedAll = sv.roth401k + sv.hsa + sv.rothIra + sv.brokerage;
+  sv.lump = Object.keys(P).reduce((s, k) => s + (+P[k].rothIraLump || 0), 0); // IRA money put in outside payroll, e.g. a backdoor lump sum
+  const savedAll = sv.roth401k + sv.hsa + sv.rothIra + sv.brokerage + sv.lump;
   let planned = 0; monthRows(latestMonth()).forEach(r => { if (r.a > 0) planned += r.a; });
   const surplus = toChecking / 12 - planned;
   return { gross, taxes, ded, employer, toChecking, sv, savedAll, per, planned, surplus };
+}
+function depAccts(w) { // direct deposit accounts on the person's newest normal stub
+  const lt = S.set.people[w].lastTypical; if (!lt || !lt.deposits) return [];
+  const by = {}; lt.deposits.forEach(d => { by[d.last4] = (by[d.last4] || 0) + d.amt; });
+  return Object.keys(by).map(a => ({ last4: a, amt: by[a] }));
+}
+function depUnmapped(w) { const dm = S.set.depositMap || {}, a = depAccts(w); return a.length > 1 && a.every(x => !dm[x.last4]); } // no account has been assigned yet, not even to checking
+function rederiveDeposits(w) { // re-split brokerage and Roth IRA from the stored stub after the account map changes
+  const p = S.set.people[w], lt = p.lastTypical; if (!lt || !lt.deposits || !lt.deposits.length) return;
+  const dm = S.set.depositMap || {}; let ira = 0, brk = 0;
+  lt.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'rothIra') ira += d.amt; else if (k === 'brokerage') brk += d.amt; });
+  p.rothIra = Math.round(ira * 100) / 100; p.brokerage = Math.round(brk * 100) / 100;
+}
+function depSelect(a, amt, id) {
+  const cur = (S.set.depositMap || {})[a] || 'checking';
+  return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + [['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']].map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
 }
 function tracker() {
   const st = S.set, P = st.people, L = st.limits, N = st.paychecks, rows = [];
@@ -722,7 +739,7 @@ function update() {
   const needList = sn ? Array.from(new Set(sn.cats.filter(c => kindOf(c.g, c.c) !== 'ignore').map(c => c.c))) : [];
   const stl = sn ? stale() : [];
   const pf = (who, k, lab, step) => '<div class="fld"><label for="p-' + who + k + '">' + lab + '</label><input id="p-' + who + k + '" type="number" step="' + (step || '0.01') + '" value="' + (st.people[who][k] === '' ? '' : st.people[who][k]) + '" data-a="pay" data-who="' + who + '" data-k="' + k + '"></div>';
-  const people = Object.keys(st.people).map(w => '<h3 style="margin-top:14px">' + esc(st.people[w].label) + '</h3>' + [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax per paycheck'], ['otherPost', 'Other post-tax deductions (parking) per paycheck'], ['roth401k', 'Roth 401(k) per paycheck'], ['hsa', 'HSA per paycheck'], ['rothIra', 'Roth IRA per paycheck'], ['brokerage', 'Brokerage per paycheck'], ['pretaxOther', 'Other pre-tax (insurance) per paycheck'], ['matchPct', 'Employer match, % of pay'], ['matchNeeds', 'Your deferral needed for full match, %'], ['annualEmpPct', 'Annual employer contribution, % of pay'], ['hsaSeed', 'Employer HSA seed per year', '1'], ['rothIraLump', 'Roth IRA contributed outside payroll', '1'], ['ytdRothIra', 'Roth IRA contributed so far via payroll (optional)', '1']].map(f => pf(w, f[0], f[1], f[2])).join('') + '<div class="fld"><label for="n-' + w + '">Next payday</label><input id="n-' + w + '" type="date" value="' + st.people[w].next + '" data-a="pay" data-who="' + w + '" data-k="next"></div>').join('');
+  const people = Object.keys(st.people).map(w => '<h3 style="margin-top:14px">' + esc(st.people[w].label) + '</h3>' + [['gross', 'Gross per paycheck'], ['taxes', 'Taxes and payroll tax per paycheck'], ['otherPost', 'Other post-tax deductions (parking) per paycheck'], ['roth401k', 'Roth 401(k) per paycheck'], ['hsa', 'HSA per paycheck'], ['rothIra', 'Roth IRA per paycheck'], ['brokerage', 'Brokerage per paycheck'], ['pretaxOther', 'Other pre-tax (insurance) per paycheck'], ['matchPct', 'Employer match, % of pay'], ['matchNeeds', 'Your deferral needed for full match, %'], ['annualEmpPct', 'Annual employer contribution, % of pay'], ['hsaSeed', 'Employer HSA seed per year', '1'], ['rothIraLump', 'Roth IRA contributed outside payroll', '1'], ['ytdRothIra', 'Roth IRA contributed so far via payroll (optional)', '1']].map(f => pf(w, f[0], f[1], f[2])).join('') + (function () { const da = depAccts(w); return da.length ? '<details' + (depUnmapped(w) ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Deposits marked Brokerage or Roth IRA count as savings and fill the two fields above. Everything else counts as checking.</p>' + da.map(x => depSelect(x.last4, x.amt, 'sdm' + w + x.last4)).join('') + '</details>' : ''; })() + '<div class="fld"><label for="n-' + w + '">Next payday</label><input id="n-' + w + '" type="date" value="' + st.people[w].next + '" data-a="pay" data-who="' + w + '" data-k="next"></div>').join('');
   return (S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') +
     (function () {
       const tok = tokGet(), bid = tokBudget();
@@ -771,6 +788,7 @@ function flags() {
     else if (r.left > 1 && r.ira) add('info', r.who + '’s Roth IRA has ' + fmt(r.left) + ' of room left for ' + st.year + ', open until Apr 15, ' + (st.year + 1) + '.');
   });
   Object.keys(P).forEach(k => { const p = P[k], d = p.gross ? p.roth401k / p.gross * 100 : 0; if (p.gross && d + 0.01 < p.matchNeeds) add('warn', p.label + ' defers ' + d.toFixed(1) + '% to the 401(k) but needs ' + p.matchNeeds + '% for the full employer match.'); });
+  Object.keys(P).forEach(k => { if (depUnmapped(k)) add('warn', P[k].label + '\u2019s pay goes to ' + depAccts(k).length + ' accounts, and none has been assigned yet, so any brokerage or Roth IRA deposits are counted as checking and left out of the savings rate. Assign them under Settings on the Update tab.'); });
   const magi = magiNow();
   if (magi > L.roHi) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', above the ' + fmt(L.roHi) + ' Roth IRA limit. Roth IRA money goes in through the backdoor.');
   else if (magi > L.roLo) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', inside the Roth IRA phase-out range. Wait for the W-2s before choosing direct or backdoor.');
@@ -799,7 +817,7 @@ function insightContext() {
     balancesByType: Object.keys(t).reduce((o, k) => { o[k] = r1(t[k]); return o; }, {}), netWorth: nwAt(i),
     netWorthHistory: sn.months.slice(-7).map((m, j, a) => ({ month: m, value: nwAt(sn.months.length - a.length + j) })),
     emergencyFundMonthsOfNeeds: ns ? +(t.emergency / ns).toFixed(1) : null, targetMonths: st.monthsTarget, monthlyNeeds: r1(ns), monthlyPlannedSpending: r1(c.planned), monthlyLeftOver: r1(c.surplus),
-    annualGross: r1(c.gross), annualSavedThroughPayrollAndBrokerage: r1(c.savedAll), annualEmployerMoney: r1(c.employer), estimatedMAGI: r1(magiNow()), rothIraPhaseOut: [st.limits.roLo, st.limits.roHi],
+    annualGross: r1(c.gross), annualSavedThroughPayrollAndBrokerage: r1(c.savedAll), rothIraOutsidePayroll: r1(c.sv.lump), savingsRateOfGrossWithEmployer: c.gross > 0 ? +((c.savedAll + c.employer) / c.gross * 100).toFixed(1) : null, annualEmployerMoney: r1(c.employer), estimatedMAGI: r1(magiNow()), rothIraPhaseOut: [st.limits.roLo, st.limits.roHi],
     paychecksPerYear: st.paychecks, people,
     contributionRoom: tracker().map(r => ({ who: r.who, account: r.acct, projectedYear: r1(r.proj), limit: r.lim, roomLeft: r1(r.left) })),
     overspentThisMonth: sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[i] < -1).map(x => ({ category: x.c, over: r1(-x.v[i]) })).slice(0, 8),
@@ -1009,8 +1027,9 @@ function payBlock() {
         '<p class="muted" style="font-size:13px">Year to date at ' + niceDate(o.date) + ': Roth 401(k) ' + fmt2(o.ytd.roth401k) + ', HSA ' + fmt2(o.ytd.hsa) + ', gross ' + fmt2(o.ytd.gross) + '. Taxes include state paid leave premiums.</p>' +
         (o.notes.length ? '<ul class="alerts">' + o.notes.map(n => '<li><span class="mk"></span><span>' + esc(n) + '</span><span></span></li>').join('') + '</ul>' : '');
       const accts = Array.from(new Set(o.deposits.map(d => d.last4)));
-      if (accts.length) h += '<details><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Tell the app where each deposit goes. Only brokerage and Roth IRA deposits change the numbers above.</p>' +
-        accts.map(a => { const cur = (S.set.depositMap || {})[a] || 'checking', amt = o.deposits.filter(d => d.last4 === a).reduce((s, d) => s + d.amt, 0); return '<div class="fld"><label for="dm' + a + i + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="dm' + a + i + '" data-a="stubdep" data-v="' + a + '">' + [['checking', 'Checking or savings'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']].map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>'; }).join('') + '</details>';
+      const dm0 = S.set.depositMap || {}, open0 = accts.length > 1 && accts.every(a => !dm0[a]);
+      if (accts.length) h += '<details' + (open0 ? ' open' : '') + '><summary>Direct deposit accounts</summary><p class="muted" style="font-size:13px">Tell the app where each deposit goes. Only brokerage and Roth IRA deposits change the numbers above.</p>' +
+        accts.map(a => depSelect(a, o.deposits.filter(d => d.last4 === a).reduce((s, d) => s + d.amt, 0), 'dm' + a + i)).join('') + '</details>';
       h += '<div class="tools"><button class="btn" data-a="stubapply" data-v="' + i + '">Use these numbers for ' + esc(p.label) + '</button></div>';
     }
     h += '</div>';
@@ -1026,7 +1045,9 @@ function render() {
   if (S.tab === 'update') body = update();
   else if (!S.snap && S.tab !== 'pay') body = emptyView();
   else body = ({ overview, plan, retire, pay, loans, runway, insights }[S.tab] || overview)();
+  const openSecs = new Set(Array.from(app.querySelectorAll('details[open] > summary')).map(x => x.textContent)); // keep expanded sections expanded across re-renders
   app.innerHTML = header() + '<main>' + (S.tab !== 'update' && S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') + body + '</main>';
+  app.querySelectorAll('details > summary').forEach(x => { if (openSecs.has(x.textContent)) x.parentNode.open = true; });
   wireDrop();
   if (focusId) { const el = document.getElementById(focusId); if (el && el.focus) try { el.focus(); } catch (e) { } }
 }
@@ -1175,7 +1196,7 @@ document.addEventListener('change', ev => {
   const a = el.dataset.a, v = el.dataset.v, st = S.set;
   if (a === 'stubfile') { if (el.files && el.files.length) importStubs(Array.from(el.files)); }
   else if (a === 'stubwho') { P2.who = P2.who || {}; P2.who[v] = el.value; render(); }
-  else if (a === 'stubdep') { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; saveSettings(); render(); }
+  else if (a === 'stubdep') { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; Object.keys(st.people).forEach(w => { if (depAccts(w).some(x => x.last4 === v)) rederiveDeposits(w); }); saveSettings(); render(); }
   else if (a === 'restore') { restoreFile(el.files && el.files[0]); }
   else if (a === 'ynabbudget') { tokBudgetSet(el.value); render(); }
   else if (a === 'month') { S.month = el.value; S.openCat = null; render(); }
