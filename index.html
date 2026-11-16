@@ -441,11 +441,28 @@ function applyDoc(kind, data) {
   if (S.snap && (!S.month || S.snap.months.indexOf(S.month) < 0)) S.month = latestMonth();
   render();
 }
+/* Installed copies (an iPhone home-screen icon especially) can keep running an old page.
+   On open and on return, fetch the live page past every cache; if its version differs, reload once.
+   Bump APP_VERSION with every change to this file. */
+const APP_VERSION = '2026-11-15.2';
+let updCheckedAt = 0;
+async function checkForUpdate() {
+  if (Date.now() - updCheckedAt < 60000) return; updCheckedAt = Date.now();
+  try {
+    const r = await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
+    const m = (await r.text()).match(new RegExp('APP_VER' + "SION = '([^']+)'")); if (!m || m[1] === APP_VERSION) return;
+    let tried = ''; try { tried = sessionStorage.getItem('fin.updTried') || ''; } catch (e) { /* storage blocked */ }
+    if (tried === m[1]) return; // already reloaded for this version; don't loop if a cache still serves the old page
+    try { sessionStorage.setItem('fin.updTried', m[1]); } catch (e) { /* storage blocked */ }
+    location.replace(location.pathname + '?v=' + encodeURIComponent(m[1]));
+  } catch (e) { /* offline: keep the copy we have */ }
+}
 async function boot() {
   S.mode = 'local';
   applyDoc('set', lsGet('fin.settings')); applyDoc('snap', lsGet('fin.snapshot'));
+  checkForUpdate();
   if (syncCfg()) syncPull({});
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && syncCfg() && Date.now() - (S.syncPulledAt || 0) > 20000) syncPull({}); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; checkForUpdate(); if (syncCfg() && Date.now() - (S.syncPulledAt || 0) > 20000) syncPull({}); });
 }
 
 /* ---------- device sync: one encrypted file in a secret GitHub Gist ----------
