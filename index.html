@@ -163,6 +163,23 @@ details>summary{cursor:pointer;font-weight:600;padding:2px 0}
 .aibox h3:first-child{margin-top:0!important}
 ul.ins{margin:4px 0 8px;padding-left:20px}
 ul.ins li{margin:4px 0}
+.status{margin:22px 0 6px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--good)}
+.status.lv-warn{border-left-color:var(--warn)} .status.lv-bad{border-left-color:var(--bad)} .status.lv-na{border-left-color:var(--muted)}
+.status .sh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-family:var(--display);font-weight:600;font-size:clamp(18px,3.4vw,22px);line-height:1.25}
+.pill{font-size:12.5px;font-weight:700;padding:2px 10px;border-radius:999px;white-space:nowrap;background:var(--soft);font-family:var(--body)}
+.pill.lv-ok{color:var(--good)} .pill.lv-warn{color:var(--warn)} .pill.lv-bad{color:var(--bad)} .pill.lv-na{color:var(--muted)}
+.srows{list-style:none;margin:12px 0 0;padding:12px 0 0;border-top:1px solid var(--line);display:grid;gap:12px}
+.srows li{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:start}
+.srows .dot{width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--good)}
+.srows .dot.lv-warn{background:var(--warn)} .srows .dot.lv-bad{background:var(--bad)} .srows .dot.lv-na{background:var(--muted)}
+.srows .t{font-weight:600}
+.srows .sd{font-size:13.5px;color:var(--muted)}
+.srows .fix{font-size:13.5px;margin-top:3px}
+.srows .fix b{color:var(--accent-deep)}
+.srows .v{font-variant-numeric:tabular-nums;text-align:right;font-size:13.5px;white-space:nowrap;color:var(--muted)}
+@media(max-width:560px){.srows li{grid-template-columns:12px 1fr}.srows .v{grid-column:2;text-align:left;white-space:normal}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sm{font-size:12px}
 </style>
 </head>
 <body>
@@ -241,7 +258,7 @@ const FinParse = (function () {
     const accts = {}, tx = [];
     const first = months[0], lastM = months[months.length - 1];
     const asOfM = asOf.slice(0, 7);
-    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 120);
+    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 400); // about 13 months of detail, for spending trends and recurring charges
     const cutIso = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
     reg.forEach(r => {
       const d = isoDate(r.Date); if (!d || d > asOf) return;
@@ -302,9 +319,9 @@ const FinParse = (function () {
     const catList = order.map(k => cats[k]).filter(o => !(o.hid && !o.a.some(Boolean) && !o.x.some(Boolean) && !o.v.some(Boolean)));
     catList.forEach(o => { delete o.hid; });
 
-    // accounts: month-end balances from transactions, last 120 days of detail
+    // accounts: month-end balances from transactions, about 13 months of detail
     const first = months[0];
-    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 120);
+    const cutoff = new Date(asOf + 'T00:00:00'); cutoff.setDate(cutoff.getDate() - 400); // about 13 months of detail, for spending trends and recurring charges
     const cutIso = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
     const subs = {}; (b.subtransactions || []).forEach(s => { if (!s.deleted) (subs[s.transaction_id] = subs[s.transaction_id] || []).push(s); });
     const accts = {}, tx = []; let count = 0;
@@ -402,7 +419,12 @@ function defaults() {
     people: { chris: person('Chris'), sami: person('Sami') },
     checks: {}, depositMap: {}, depositYnab: {}, history: {}, contrib: {}, steps: [],
     goals: '',
-    runway: { added: 0, addedSami: 0 }
+    runway: { added: 0, addedSami: 0 },
+    // goals behind the status lines (Stay-Home Plan, Nov 2026)
+    bridge: { target: 150000, by: '2027-09-30', ret: 0, keepCash: 5560 },
+    stay: { who: 'chris', k401Pct: 3, familyPremium: 613.10, baseGross: 127500, baseDate: '2026-10-22', floorPct: 6.25, pathPct: 10.2 },
+    spend: { plan: 5960 },
+    k401Target: { chris: { pct: 10, from: '2027-01-01' }, sami: { pct: 5, from: '' } }
   };
 }
 function mergeDefaults(a, d) { // keep user values, fill any missing keys
@@ -766,7 +788,7 @@ function payCheckIssues() { const pc = payCheck() || []; const iss = []; pc.forE
 function payCheckBlock() {
   const pc = payCheck();
   let h = '<section class="blk"><h2>Paychecks vs YNAB</h2><p class="lede">Each deposit on a pay stub should show up as an inflow in its YNAB account within a few days of payday. Accounts are paired under Settings \u2192 Paychecks \u2192 Direct deposit accounts.</p>';
-  if (!pc) return h + '<p class="muted">Sync YNAB first; the check uses the last 120 days of YNAB transactions.</p></section>';
+  if (!pc) return h + '<p class="muted">Sync YNAB first; the check uses the last 13 months of YNAB transactions.</p></section>';
   if (!pc.length) return h + '<p class="muted">No recent checks with deposit detail yet. Drop your latest pay stub PDFs on the Update tab and apply them; older checks entered by hand or from CSV don\u2019t list deposits.</p></section>';
   const lab = { ok: ['good', '\u2713 in YNAB'], pending: ['muted', 'not in YNAB yet (recent)'], missing: ['bad', 'missing from YNAB'], differs: ['bad', 'amount differs'], extra: ['bad', 'in YNAB, not on stub'], unmapped: ['muted', 'pick its YNAB account'], skip: ['muted', 'not tracked in YNAB'] };
   pc.forEach(c => {
@@ -813,7 +835,7 @@ function header() {
   }
   return '<header class="top"><div><h1>Chris &amp; Sami</h1><div class="sub">' + esc(sub) + warn + '</div></div>' +
     '<button class="btn" data-a="tab" data-v="update">Update data</button></header>' +
-    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['plan', 'Plan'], ['retire', 'Retirement'], ['pay', 'Pay'], ['loans', 'Loans'], ['runway', 'Runway'], ['insights', 'Insights'], ['update', 'Update']].map(t =>
+    '<nav class="tabs" role="tablist">' + [['overview', 'Overview'], ['spending', 'Spending'], ['plan', 'Plan'], ['retire', 'Retirement'], ['pay', 'Pay'], ['loans', 'Loans'], ['runway', 'Runway'], ['insights', 'Insights'], ['update', 'Update']].map(t =>
       '<button role="tab" aria-selected="' + (S.tab === t[0]) + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav>';
 }
 function emptyView() {
@@ -841,7 +863,7 @@ function overview() {
   const from = Math.max(0, mths.length - 25), prev = series.length > 1 ? series[series.length - 2] : nw;
   const newAcc = sn.accts.filter(a => acctType(a.n) !== 'ignore' && a.first.slice(0, 7) === latestMonth() && a.bal !== 0 && (a.s.length < 2 || a.s[a.s.length - 2] === 0));
   const order = ['cash', 'emergency', 'savings', 'brokerage', 'retire', 'hsa'];
-  return '<div class="verdict">' + esc(verdict) + '</div>' +
+  return statusHtml(statusOverview()) + '<h2 style="margin-top:22px">' + esc(verdict) + '</h2>' +
     '<p class="lede">That is ' + fmt(c.savedAll + c.employer) + ' a year through payroll and employer contributions' + (c.surplus > 0 ? ', plus about ' + fmt(c.surplus) + ' a month left after the YNAB targets.' : '. Planned spending now uses all of the monthly take-home.') + '</p>' +
     '<div class="kpis"><div class="kpi"><div class="v">' + pct(rate) + '</div><div class="l">of gross saved, with employer money</div></div><div class="kpi"><div class="v">' + fmt(c.surplus) + '</div><div class="l">left each month after targets</div></div><div class="kpi"><div class="v">' + months.toFixed(1) + ' mo</div><div class="l">emergency fund covers needs</div></div><div class="kpi"><div class="v">' + fmt(nw) + '</div><div class="l">net worth</div></div></div>' +
     '<section class="blk"><h2>Next up</h2>' + (next.length ? next.map(x => '<div class="chk"><span></span><span><span class="t">' + esc(x.t) + '</span>' + (x.n ? '<div class="note">' + esc(x.n) + '</div>' : '') + '</span><span class="due">' + (x.due ? 'by ' + niceDate(x.due) : '') + '</span></div>').join('') + '<p style="margin-top:10px"><button class="btn ghost small" data-a="tab" data-v="plan">Open the full plan</button></p>' : '<p class="good">Every priority is ticked off.</p>') + '</section>' +
@@ -851,7 +873,7 @@ function overview() {
     '<tr><th>Credit cards owed</th><td class="num">' + fmt(t.card) + '</td></tr><tr><th>Student loans</th><td class="num">' + fmt(t.loan) + '</td></tr><tr class="total"><th>Net worth</th><td class="num">' + fmt(nw) + '</td></tr></tbody></table>' +
     '<p class="muted" style="font-size:13px">' + (nw - prev >= 0 ? 'Up ' : 'Down ') + fmt(Math.abs(nw - prev)) + ' since last month-end. Investment accounts only move when reconciled in YNAB.' + (newAcc.length ? ' That includes the opening balances of ' + newAcc.length + ' accounts added to YNAB this month.' : '') + '</p></div>' +
     '<div><h2>Net worth, last ' + (mths.length - from) + ' months</h2>' + lineChart(series.slice(from), mths.slice(from).map(monthShort)) + '</div></section>' +
-    '<section class="blk"><h2>What lives elsewhere</h2><p class="lede">YNAB already covers spending reports, category targets and its own net worth chart, so they\u2019re not repeated here. For investment returns, fees and a retirement projection, a free Empower account or your Fidelity login does the job: YNAB only sees balances, not holdings or performance.</p></section>';
+    '<section class="blk"><h2>What lives elsewhere</h2><p class="lede">For investment returns, fees and a retirement projection, a free Empower account or your Fidelity login does the job: YNAB only sees balances, not holdings or performance.</p></section>';
 }
 
 function plan() {
@@ -871,7 +893,7 @@ function plan() {
   let pool = t.savings; const pool0 = pool;
   items.forEach(x => { x.cov = Math.min(pool, x.need); pool -= x.cov; x.short = x.need - x.cov; });
   const short = items.reduce((s, x) => s + x.short, 0);
-  return '<h2>Where each dollar goes</h2><p class="lede">From the latest pay stubs, over a full year. Spending is this month\u2019s YNAB targets.</p>' +
+  return statusHtml(statusPlan()) + '<h2 style="margin-top:22px">Where each dollar goes</h2><p class="lede">From the latest pay stubs, over a full year. Spending is this month\u2019s YNAB targets.</p>' +
     '<div class="split" role="img" aria-label="Share of gross income by use">' + seg.map(s => '<span title="' + s[2] + '" style="width:' + (s[0] / g * 100).toFixed(2) + '%;background:' + s[1] + '"></span>').join('') + '</div>' +
     '<div class="legend">' + seg.map(s => '<span><i style="background:' + s[1] + '"></i>' + s[2] + ' ' + pct(s[0] / g) + '</span>').join('') + '</div>' +
     '<div class="tw"><table class="stmt"><thead><tr><th></th><th class="num">Per month</th><th class="num">Per year</th><th class="num">Of gross</th></tr></thead><tbody>' +
@@ -922,7 +944,7 @@ function retire() {
   const warns = []; Object.keys(P).forEach(k => { const p = P[k], d = p.roth401k / p.gross * 100; if (d + 0.01 < p.matchNeeds) warns.push(p.label + ' defers ' + d.toFixed(1) + '% but needs ' + p.matchNeeds + '% for the full match.'); });
   const pos = Math.max(0, Math.min(1, (magi - (lo - 20000)) / ((hi + 20000) - (lo - 20000))));
   const srcTxt = { actual: 'actual', history: 'from paycheck history', stub: 'from latest stub', estimate: 'estimate' };
-  return '<h2>' + st.year + ' contribution room</h2><p class="lede">Projected for the full year: what has gone in so far plus the paychecks left. When you check an account at Fidelity, Optum or your plan, type the year-to-date total into Actual so far. Tick Done once an account is finished for the year.</p>' +
+  return statusHtml(statusRetire()) + '<h2 style="margin-top:22px">' + st.year + ' contribution room</h2><p class="lede">Projected for the full year: what has gone in so far plus the paychecks left. When you check an account at Fidelity, Optum or your plan, type the year-to-date total into Actual so far. Tick Done once an account is finished for the year.</p>' +
     '<div class="tw"><table class="stmt contrib"><thead><tr><th>Account</th><th class="num">Per paycheck</th><th class="num">Actual so far</th><th class="num">Projected</th><th class="num">Limit</th><th class="num">Room left</th><th class="num">Done</th></tr></thead><tbody>' +
     tr.map(x => '<tr' + (x.done ? ' class="muted"' : '') + '><th>' + esc(x.who) + ' · ' + esc(x.acct) + '</th><td class="num">' + fmt2(x.per) + '</td>' +
       '<td class="num"><input type="number" step="0.01" min="0" placeholder="enter" value="' + (x.actual != null ? x.actual : '') + '" data-a="contrib" data-v="' + x.key + '" data-k="actual" aria-label="' + esc(x.who + ' ' + x.acct) + ' actual so far">' + (x.actual != null ? '<div class="sm">as of <input type="date" value="' + esc(x.asOf) + '" data-a="contrib" data-v="' + x.key + '" data-k="asOf" aria-label="As of date"></div>' : '') + '</td>' +
@@ -941,7 +963,7 @@ function runwayCalc(who) {
   const st = S.set, c = calc(), t = typeTotals(curIdx()), ns = monthlyNeeds();
   const liquid = t.cash + t.emergency + t.savings + t.brokerage + t.card;
   const other = who === 'sami' ? 'chris' : 'sami';
-  const keep = c.per[other].chk / 12, added = +(who === 'sami' ? st.runway.addedSami : st.runway.added) || 0;
+  const keep = takeHome(other), added = +(who === 'sami' ? st.runway.addedSami : st.runway.added) || 0;
   const sc = [['Needs only', ns], ['All current targets', c.planned]].map(x => { const spend = x[1] + added, gap = spend - keep; return { n: x[0], spend, gap, mo: gap > 0 ? liquid / gap : Infinity }; });
   return { who, other, keep, added, liquid, sc };
 }
@@ -951,15 +973,15 @@ function runway() {
   const moTxt = s => isFinite(s.mo) ? (s.mo >= 120 ? '10+ years' : dur(Math.round(s.mo))) : 'No drawdown';
   const seg = '<div class="seg" role="group" aria-label="Whose paycheck stops">' + ['chris', 'sami'].map(k => '<button data-a="runwho" data-v="' + k + '" aria-pressed="' + (k === who) + '">' + esc(P[k].label) + '</button>').join('') + '</div>';
   const both = [R, RO].sort((a, b) => (a.who === 'chris' ? -1 : 1)).map(r => '<tr><th>If ' + esc(P[r.who].label) + '’s paycheck stopped</th>' + r.sc.map(s => '<td class="num">' + moTxt(s) + '</td>').join('') + '</tr>').join('');
-  return '<h2>If ' + esc(lost) + '’s paycheck stopped</h2><p class="lede">A rough check for a lost job or a leap into something new. ' + esc(kept) + '’s take-home keeps covering the bills; savings and the brokerage fill any gap.</p>' + seg +
-    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(R.keep) + '</div><div class="l">' + esc(kept) + '’s take-home per month</div></div><div class="kpi"><div class="v">' + fmt(R.liquid) + '</div><div class="l">liquid savings and brokerage, after card balances</div></div></div>' +
+  return statusHtml(statusRunway()) + bridgeBlock() + '<h2 style="margin-top:22px">If ' + esc(lost) + '’s paycheck stopped</h2><p class="lede">A rough check for a lost job or a leap into something new. ' + esc(kept) + '’s take-home keeps covering the bills; savings and the brokerage fill any gap.</p>' + seg +
+    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(R.keep) + '</div><div class="l">' + esc(kept) + '’s full take-home per month</div></div><div class="kpi"><div class="v">' + fmt(R.liquid) + '</div><div class="l">liquid savings and brokerage, after card balances</div></div></div>' +
     '<div class="tw"><table class="stmt"><thead><tr><th></th>' + R.sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' +
     '<tr><th>Monthly spending</th>' + R.sc.map(s => '<td class="num">' + fmt(s.spend - R.added) + '</td>').join('') + '</tr>' +
     '<tr><th>Added costs without ' + esc(lost) + '’s employer</th>' + R.sc.map(() => '<td class="num">' + fmt(R.added) + '</td>').join('') + '</tr>' +
     '<tr><th>' + esc(kept) + '’s take-home</th>' + R.sc.map(() => '<td class="num">' + fmt(-R.keep) + '</td>').join('') + '</tr>' +
     '<tr class="total"><th>Monthly gap</th>' + R.sc.map(s => '<td class="num ' + (s.gap > 0 ? 'bad' : 'good') + '">' + (s.gap > 0 ? fmt(s.gap) : 'Covered, ' + fmt(-s.gap) + ' spare') + '</td>').join('') + '</tr>' +
     '<tr><th>Runway from savings</th>' + R.sc.map(s => '<td class="num">' + moTxt(s) + '</td>').join('') + '</tr></tbody></table></div>' +
-    '<p class="muted" style="font-size:13px">Assumes ' + esc(kept) + '’s pay and deductions stay as they are, and that ' + esc(lost) + '’s Roth IRA, brokerage, money market and 401(k) saving stops. Added costs are your own estimate, such as replacing employer health coverage (' + fmt(R.added) + ' a month). Change them under Settings. Self-employment taxes and business costs aren’t modeled.</p>' +
+    '<p class="muted" style="font-size:13px">Uses ' + esc(kept) + '’s full take-home: their brokerage, money market and Roth IRA deposits would pause and go to bills instead. Assumes ' + esc(kept) + '’s pay and deductions stay as they are, and that ' + esc(lost) + '’s saving stops. Added costs are your own estimate, such as replacing employer health coverage (' + fmt(R.added) + ' a month). Change them under Settings. Self-employment taxes and business costs aren’t modeled.</p>' +
     '<section class="blk"><h3>Side by side</h3><div class="tw"><table class="stmt"><thead><tr><th>Runway from savings</th>' + R.sc.map(s => '<th class="num">' + s.n + '</th>').join('') + '</tr></thead><tbody>' + both + '</tbody></table></div></section>' +
     '<section class="blk"><h2>Reading this</h2><p class="lede">Needs only means rent, parking, utilities, insurance, groceries, gas, loan minimums and the other needs ticked under Settings. Retirement and HSA balances are left out, since tapping them early costs penalties.</p></section>';
 }
@@ -972,7 +994,7 @@ function loans() {
   const asOf = S.snap.asOf;
   const lastPaid = plan.loans.slice().sort((a, b) => (a.paid || 9999) - (b.paid || 9999));
   const baseP = x => x.capped ? 'Never at this payment' : addMonths(asOf, x.months);
-  return '<h2>Student loans</h2><p class="lede">Balances come from your YNAB loan accounts and minimums from this month\u2019s category targets. Rates are entered here, since YNAB\u2019s export doesn\u2019t include them.</p>' +
+  return statusHtml(statusLoans()) + '<h2 style="margin-top:22px">Student loans</h2><p class="lede">Balances come from your YNAB loan accounts and minimums from this month\u2019s category targets. Rates are entered here, since YNAB\u2019s export doesn\u2019t include them.</p>' +
     '<div class="kpis"><div class="kpi"><div class="v">' + fmt(bal) + '</div><div class="l">total owed</div></div><div class="kpi"><div class="v">' + wr.toFixed(2) + '%</div><div class="l">average rate</div></div><div class="kpi"><div class="v">' + fmt(yi) + '</div><div class="l">interest per year</div></div><div class="kpi"><div class="v">' + fmt2(mins) + '</div><div class="l">minimums per month</div></div></div>' +
     '<div class="tw"><table class="stmt"><thead><tr><th>Loan</th><th class="num">Balance</th><th class="num">Rate %</th><th class="num">Minimum</th><th class="num">Paid off</th></tr></thead><tbody>' +
     L.map(l => { const r = plan.loans.find(x => x.name === l.name); return '<tr><th>' + esc(l.name) + '</th><td class="num">' + fmt2(l.bal) + '</td><td class="num"><input type="number" step="0.01" min="0" value="' + l.rate + '" data-a="rate" data-v="' + esc(l.id) + '" aria-label="Rate for ' + esc(l.name) + '"></td><td class="num">' + fmt2(l.min) + '</td><td class="num">' + (r && r.paid ? addMonths(asOf, r.paid) : '\u2014') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
@@ -1016,10 +1038,21 @@ function update() {
     '<details><summary>What counts as a need</summary><p class="muted" style="font-size:13px">Drives the cash cushion. Needs are summed from this month\u2019s targets.</p><div style="columns:2 240px">' + needList.map(c => '<label style="display:block;break-inside:avoid"><input type="checkbox" data-a="need" data-v="' + esc(c) + '" ' + (nset.has(c) ? 'checked' : '') + '> ' + esc(c) + '</label>').join('') + '</div><div class="fld" style="margin-top:12px"><label for="mt">Emergency fund target, months of needs</label><input id="mt" type="number" step="1" min="1" value="' + st.monthsTarget + '" data-a="mt"></div></details>' +
     '<details><summary>Paychecks and contribution limits</summary><p class="muted" style="font-size:13px">From your latest pay stubs. Update when pay or deferrals change.</p>' + people +
     '<h3 style="margin-top:14px">If Chris leaves his job</h3><div class="fld"><label for="rw">Added monthly costs (health coverage and the like)</label><input id="rw" type="number" step="10" value="' + st.runway.added + '" data-a="rw"></div><h3 style="margin-top:14px">If Sami leaves her job</h3><div class="fld"><label for="rw2">Added monthly costs (health coverage and the like)</label><input id="rw2" type="number" step="10" value="' + (st.runway.addedSami || 0) + '" data-a="rw2"></div><h3 style="margin-top:14px">Limits for ' + st.year + '</h3>' + [['k401', '401(k) employee limit'], ['hsa', 'HSA limit, self-only'], ['ira', 'IRA limit'], ['roLo', 'Roth IRA phase-out starts (joint)'], ['roHi', 'Roth IRA phase-out ends (joint)']].map(f => '<div class="fld"><label for="l-' + f[0] + '">' + f[1] + '</label><input id="l-' + f[0] + '" type="number" step="1" value="' + st.limits[f[0]] + '" data-a="lim" data-k="' + f[0] + '"></div>').join('') + '<div class="fld"><label for="py">Plan year</label><input id="py" type="number" step="1" value="' + st.year + '" data-a="py"></div><div class="fld"><label for="pc">Paychecks this year</label><input id="pc" type="number" step="1" value="' + st.paychecks + '" data-a="pc"></div></details>' +
-    syncBlock() + '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
+    goalsBlock() + syncBlock() + '<details><summary>Backup and restore</summary><p class="muted" style="font-size:13px">Saves everything this page knows as a file, or loads one back. Use it to set up a second device.</p><button class="btn ghost small" data-a="backup">Download backup</button> <button class="btn ghost small" data-a="reset">Reset settings to defaults</button><div class="fld" style="margin-top:12px"><label for="restore">Restore from a backup or settings file</label><input id="restore" type="file" accept=".json,application/json" data-a="restore"></div></details></section>';
 }
 
 
+
+function goalsBlock() {
+  const st = S.set, P = st.people;
+  const f = (path, lab, type, step) => { const v = path.split('.').reduce((o, k) => (o == null ? '' : o[k]), st); return '<div class="fld"><label for="g-' + path + '">' + lab + '</label><input id="g-' + path + '" type="' + (type || 'number') + '"' + (step ? ' step="' + step + '"' : '') + ' value="' + esc(v == null ? '' : v) + '" data-a="cfg" data-k="' + path + '"></div>'; };
+  return '<details><summary>Goals behind the status lines</summary><p class="muted" style="font-size:13px">Each tab compares the numbers with these goals. Amber means within 10% of a goal or due within 14 days; red means missed, overdue or further off.</p>' +
+    '<h3 style="margin-top:14px">Bridge fund</h3>' + f('bridge.target', 'Target', 'number', '1000') + f('bridge.by', 'Goal date', 'date') + f('bridge.ret', 'Assumed return, % a year', 'number', '0.5') + f('bridge.keepCash', 'Money market cash that stays in cash', 'number', '10') +
+    '<h3 style="margin-top:14px">Stay-home test</h3>' + f('stay.familyPremium', 'Added monthly cost of family health coverage', 'number', '0.01') + f('stay.k401Pct', 'Roth 401(k) % on one income', 'number', '0.5') +
+    '<h3 style="margin-top:14px">Raise path</h3>' + f('stay.baseGross', 'Yearly pay at the start of the plan', 'number', '100') + f('stay.baseDate', 'Start date (raise month)', 'date') + f('stay.floorPct', 'Raise pace the bridge assumes, % a year', 'number', '0.05') + f('stay.pathPct', 'Raise pace that needs no bridge, % a year', 'number', '0.1') +
+    '<h3 style="margin-top:14px">Spending</h3>' + f('spend.plan', 'Planned monthly spending (all YNAB targets)', 'number', '10') +
+    '<h3 style="margin-top:14px">Roth 401(k) targets</h3>' + Object.keys(P).map(k => f('k401Target.' + k + '.pct', P[k].label + ', % of pay', 'number', '0.5') + f('k401Target.' + k + '.from', P[k].label + ', starting (blank if now)', 'date')).join('') + '</details>';
+}
 
 /* ---------- insights ---------- */
 const lsRaw = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
@@ -1047,7 +1080,7 @@ function flags() {
   const magi = magiNow();
   if (magi > L.roHi) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', above the ' + fmt(L.roHi) + ' Roth IRA limit. Roth IRA money goes in through the backdoor.');
   else if (magi > L.roLo) add('info', 'Estimated ' + st.year + ' MAGI is ' + fmt(magi) + ', inside the Roth IRA phase-out range. Wait for the W-2s before choosing direct or backdoor.');
-  if (c.surplus > 100) add('info', 'About ' + fmt(c.surplus) + ' a month lands in checking without a job in YNAB. Decide where it goes: brokerage, the emergency fund, or a goal.');
+  if (c.surplus > 100) add('info', 'About ' + fmt(c.surplus) + ' a month is left in checking after the YNAB targets. The plan sends it to the brokerage bridge fund (Runway tab).');
   const over = sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[curIdx()] < -1).sort((a, b) => a.v[curIdx()] - b.v[curIdx()]).slice(0, 3);
   if (over.length) add('warn', 'Overspent this month: ' + over.map(x => x.c + ' (' + fmt(-x.v[curIdx()]) + ')').join(', ') + '. Cover it in YNAB or move money.');
   Object.keys(P).forEach(k => { const m = payModel(k), lr = m.rows.slice().reverse().find(r => r.base && !r.partial); if (lr && P[k].gross && Math.abs(lr.base - P[k].gross) > 1) add('warn', P[k].label + '’s latest pay stub shows ' + fmt2(lr.base) + ' per paycheck but the app has ' + fmt2(P[k].gross) + '. Apply the stub on the Update tab.'); });
@@ -1081,7 +1114,8 @@ function insightContext() {
     overspentThisMonth: sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[i] < -1).map(x => ({ category: x.c, over: r1(-x.v[i]) })).slice(0, 8),
     loans: loanList().map(l => ({ loan: l.name, balance: r1(l.bal), ratePct: l.rate, minPayment: r1(l.min) })),
     runway: run, planYear: st.year, openChecklist: steps().filter(x => !x.done).map(x => ({ task: x.t, due: x.due || null })), doneChecklist: steps().filter(x => x.done).map(x => x.t),
-    appFlags: flags().filter(f => f.l !== 'ok').map(f => f.t)
+    appFlags: flags().filter(f => f.l !== 'ok').map(f => f.t),
+    status: statusSummary(), bridgeFund: bridgeSummary(), spending: spendSummary()
   };
 }
 function insights() {
@@ -1089,7 +1123,7 @@ function insights() {
   const fl = flags(), mk = { bad: 'bad', warn: '', info: 'info', ok: 'ok' };
   return '<h2>Insights</h2><p class="lede">Flags the app works out on its own after every sync, and a summary you can paste into your Claude project for a deeper read.</p>' +
     '<section class="blk"><h3>Flags</h3><ul class="alerts">' + fl.map(f => '<li><span class="mk ' + mk[f.l] + '"></span><span>' + esc(f.t) + '</span><span></span></li>').join('') + '</ul></section>' +
-    '<section class="blk"><h3>Ask Claude</h3><p class="muted" style="font-size:13px">After a sync, copy this summary and paste it into your Claude project. It has balances by type, pay figures, contribution room and category totals, with no transactions, account names or account numbers.</p>' +
+    '<section class="blk"><h3>Ask Claude</h3><p class="muted" style="font-size:13px">After a sync, copy this summary and paste it into your Claude project. It has the status lines from every tab, balances by type, pay figures, contribution room, the bridge fund projection and spending totals by category, with no transactions, account numbers or payee names.</p>' +
     '<div class="tools"><button class="btn" data-a="aicopy">Copy summary for Claude</button></div>' +
     '<details><summary>Show the summary</summary><textarea id="aictx" readonly rows="8" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:12px/1.4 ui-monospace,Menlo,monospace" aria-label="Summary to copy">' + esc('Money check-in summary. Tell me what changed, what to flag, and the next moves.\n\n' + JSON.stringify(insightContext())) + '</textarea></details></section>' +
     '<section class="blk"><h3>Goals and context</h3><p class="muted" style="font-size:13px">Anything that should shape the advice: targets, plans, deadlines. It is included in the summary.</p><textarea id="goals" data-a="goals" rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:inherit" aria-label="Goals and context">' + esc(st.goals || '') + '</textarea></section>';
@@ -1162,7 +1196,7 @@ function pay() {
     '<div class="fld"><label for="histwho">Whose pay</label><select id="histwho">' + keys.map(k => '<option value="' + k + '">' + esc(P[k].label) + '</option>').join('') + '</select></div>' +
     '<textarea id="histtext" rows="6" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:inherit;font:inherit" aria-label="Pasted pay history"></textarea>' +
     '<div class="tools"><button class="btn small" data-a="histadd">Add to pay history</button></div></details>';
-  if (!have.length) return '<div class="empty"><h2>No pay history yet</h2><p class="muted">Drop pay stub PDFs on the Update tab and apply them, or paste older checks below.</p></div>' + hist;
+  if (!have.length) return statusHtml(statusPay()) + '<div class="empty"><h2>No pay history yet</h2><p class="muted">Drop pay stub PDFs on the Update tab and apply them, or paste older checks below.</p></div>' + hist;
   let g = 0, n = 0, x = 0, reg = 0, tg = 0, tt = 0, sv = 0;
   keys.forEach(k => {
     const rows = M[k].rows, ry = rows.filter(r => r.d.slice(0, 4) === String(yr)), last = rows[rows.length - 1];
@@ -1171,7 +1205,7 @@ function pay() {
     const p = P[k]; if (p.ytd && +p.ytd.asOf.slice(0, 4) === yr) sv += (p.ytd.roth401k || 0) + (p.ytd.hsa || 0);
   });
   const kp = (v, l) => '<div class="kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>';
-  let out = '<h2>Pay</h2><p class="lede">Built from your pay stubs and earlier checks. Gross is before taxes and deductions; take-home is what lands in the bank.</p>' +
+  let out = statusHtml(statusPay()) + '<h2 style="margin-top:22px">Pay</h2><p class="lede">Built from your pay stubs and earlier checks. Gross is before taxes and deductions; take-home is what lands in the bank.</p>' +
     '<div class="kpis">' + kp(fmt(g), 'gross pay so far in ' + yr) + kp(fmt(n), 'take-home so far in ' + yr + ' (' + (g ? Math.round(n / g * 100) : 0) + '% of gross)') +
     kp(fmt(reg), 'regular pay per year at today’s rates') + (tg ? kp(Math.round(tt / tg * 100) + '%', 'withheld in taxes, from stub detail') : '') + (sv ? kp(fmt(sv), 'saved through payroll in ' + yr + ' (Roth 401(k) and HSA)') : '') + (x > 50 ? kp(fmt(x), 'one-time pay in ' + yr) : '') + '</div>';
   const colors = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)'], ts = d => new Date(d + 'T12:00:00').getTime();
@@ -1341,6 +1375,348 @@ function payBlock() {
   return h + '</section>';
 }
 
+/* ---------- status: one line per tab, then the parts that make it up ----------
+   Levels: ok = on track, warn = within 10% of the target or due within 14 days, bad = missed, overdue or further off.
+   Every row that isn't ok carries a Fix line with an amount and, where there is one, a date. */
+const LV = { bad: 0, warn: 1, ok: 2, na: 3 };
+const LV_TXT = { ok: 'On track', warn: 'Watch', bad: 'Off track', na: 'Unknown' };
+const MO_DAYS = 30.4375;
+const isoAdd = (iso, days) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + Math.round(days)); return d.toISOString().slice(0, 10); };
+const sum = (a, f) => a.reduce((s, x) => s + (f ? f(x) : x), 0);
+function worst(rows) { return rows.reduce((w, r) => (r.l !== 'na' && LV[r.l] < LV[w] ? r.l : w), 'ok'); }
+function band(actual, target) { return actual >= target - 0.5 ? 'ok' : actual >= target * 0.9 ? 'warn' : 'bad'; } // "at least" goals
+function bandMax(actual, limit) { return actual <= limit + 0.5 ? 'ok' : actual <= limit * 1.1 ? 'warn' : 'bad'; } // "at most" goals
+function dueLevel(due) { const d = daysBetween(todayIso(), due); return d < 0 ? 'bad' : d <= 14 ? 'warn' : 'ok'; }
+function dataAge() { return S.snap ? daysBetween(S.snap.asOf, todayIso()) : 99; }
+function mkStatus(rows, okText, needsYnab) {
+  rows = rows.filter(Boolean).sort((a, b) => LV[a.l] - LV[b.l]);
+  let l = worst(rows), h = okText, h0 = okText;
+  if (l !== 'ok') { const n = rows.filter(r => r.l === 'bad' || r.l === 'warn').length; h0 = rows[0].h || rows[0].t; h = h0 + (n > 1 ? ' (+' + (n - 1) + ' more)' : ''); }
+  if (needsYnab !== false && dataAge() > 7) { l = 'na'; h = h0 = 'Unknown until you sync: the YNAB data is ' + dataAge() + ' days old.'; }
+  return { l, h, h0, rows };
+}
+function statusHtml(s) {
+  return '<section class="status lv-' + s.l + '" aria-label="Status"><div class="sh"><span class="pill lv-' + s.l + '">' + LV_TXT[s.l] + '</span><span>' + esc(s.h) + '</span></div>' +
+    (s.rows.length ? '<ul class="srows">' + s.rows.map(r => '<li><span class="dot lv-' + r.l + '" title="' + LV_TXT[r.l] + '"></span><div><div class="t"><span class="sr">' + LV_TXT[r.l] + ': </span>' + esc(r.t) + '</div>' +
+      (r.d ? '<div class="sd">' + esc(r.d) + '</div>' : '') + (r.fix && r.l !== 'ok' ? '<div class="fix"><b>Fix:</b> ' + esc(r.fix) + '</div>' : '') +
+      (r.tab ? '<button class="btn ghost small" style="margin-top:6px" data-a="tab" data-v="' + r.tab + '">Open ' + esc(r.tabName) + '</button>' : '') + '</div><div class="v">' + esc(r.v || '') + '</div></li>').join('') + '</ul>' : '') + '</section>';
+}
+function takeHome(k) { const p = S.set.people[k]; return (p.gross - p.taxes - p.pretaxOther - p.otherPost - p.roth401k - p.hsa) * S.set.paychecks / 12; } // before the split into checking, brokerage and the rest
+
+/* ---------- bridge fund: the joint brokerage, plus money market cash on its way there ---------- */
+const MARKET_PAYEE = /reconcil|starting balance|market (change|value)|unrealized|dividend|interest|capital gain|\bgains?\b|\bloss(es)?\b/i;
+function monthsTo(bal, pmt, target, ann) {
+  if (bal >= target) return 0;
+  const r = (+ann || 0) / 1200; let b = bal;
+  for (let n = 1; n <= 600; n++) { const b0 = b; b = b * (1 + r) + pmt; if (b >= target) return n - 1 + (target - b0) / Math.max(1e-9, b - b0); }
+  return Infinity;
+}
+function pmtFor(bal, target, months, ann) {
+  if (months <= 0) return Infinity;
+  const r = (+ann || 0) / 1200; if (!r) return (target - bal) / months;
+  const g = Math.pow(1 + r, months); return (target - bal * g) * r / (g - 1);
+}
+function bridgeCalc() {
+  const b = S.set.bridge, sn = S.snap, t = typeTotals(curIdx()), c = calc(), P = S.set.people;
+  const keep = Math.max(0, +b.keepCash || 0), mm = Math.max(0, t.savings - keep), bal = t.brokerage + mm, target = +b.target || 0;
+  const fromPay = (c.sv.brokerage + c.sv.moneyMarket) / 12, left = Math.max(0, c.surplus), plan = fromPay + left;
+  // actual: net money into the brokerage and money market over the last 3 full months; market moves are left out
+  const tx = sn.tx || [], oldest = tx.length ? tx[tx.length - 1].d : sn.asOf;
+  const ms = sn.months.filter(m => m < sn.asOf.slice(0, 7)).slice(-3);
+  const accts = new Set(sn.accts.filter(a => ['brokerage', 'savings'].indexOf(acctType(a.n)) >= 0).map(a => a.n));
+  let actual = null;
+  if (ms.length === 3 && tx.length && oldest <= ms[0] + '-01') actual = sum(tx.filter(x => accts.has(x.a) && ms.indexOf(x.d.slice(0, 7)) >= 0 && !MARKET_PAYEE.test(x.p || '')), x => x.m) / 3;
+  const start = sn.asOf, toBy = daysBetween(start, b.by) / MO_DAYS;
+  const mo = monthsTo(bal, plan, target, 0), moR = +b.ret ? monthsTo(bal, plan, target, b.ret) : mo, moA = actual != null ? monthsTo(bal, actual, target, b.ret) : null;
+  const dt = m => isFinite(m) ? isoAdd(start, m * MO_DAYS) : null;
+  return { bal, mm, keep, target, fromPay, left, plan, actual, ms, ret: +b.ret || 0, by: b.by, mo, date: dt(mo), dateR: dt(moR), dateA: moA == null ? null : dt(moA), need: pmtFor(bal, target, toBy, b.ret), toBy, who: P[S.set.stay.who] ? P[S.set.stay.who].label : 'Chris' };
+}
+function bridgeRow() {
+  const B = bridgeCalc(), r = { t: 'Bridge fund: ' + fmt(B.bal) + ' of ' + fmt(B.target), v: pct(B.bal / (B.target || 1)) };
+  if (B.bal >= B.target) return Object.assign(r, { l: 'ok', d: 'Target reached. Anything above ' + fmt(B.target) + ' is flexible money.' });
+  const proj = B.ret ? B.dateR : B.date, pace = B.ret ? B.ret + '% a year growth' : 'no market growth';
+  r.d = 'Projected ' + (proj ? niceDate(proj) : 'never at this pace') + ' at ' + fmt(B.plan) + ' a month (' + pace + '). Goal: ' + niceDate(B.by) + '.' +
+    (B.actual != null ? ' Actual deposits averaged ' + fmt(B.actual) + ' a month over the last 3 months.' : '');
+  const late = !proj || proj > B.by;
+  if (!late) {
+    if (B.actual != null && B.actual < 0.9 * B.plan) return Object.assign(r, { l: 'warn', h: 'Bridge deposits are running behind plan',
+      fix: B.actual >= B.need ? 'Deposits are ' + fmt(B.plan - B.actual) + ' a month below plan. At this pace you still reach ' + fmt(B.target) + ' around ' + niceDate(B.dateA) + ', before the goal date; move the monthly leftover to the brokerage to keep the margin.'
+        : 'Put about ' + fmt(B.need) + ' a month into the brokerage (' + fmt(B.need - B.actual) + ' more than the last 3 months averaged) to hold ' + niceDate(B.by) + '. Check that the monthly leftover is being moved.' });
+    return Object.assign(r, { l: 'ok' });
+  }
+  const span = Math.max(1, daysBetween(todayIso(), B.by)), over = proj ? daysBetween(B.by, proj) : 1e9;
+  return Object.assign(r, { l: over <= 0.1 * span ? 'warn' : 'bad', h: 'Bridge fund is projected to miss ' + niceDate(B.by),
+    fix: isFinite(B.need) && B.need > 0 ? 'Put ' + fmt(B.need) + ' a month into the brokerage (' + fmt(Math.max(0, B.need - B.plan)) + ' more than planned) to reach ' + fmt(B.target) + ' by ' + niceDate(B.by) + (proj ? ', or move the goal date to ' + niceDate(proj) : '') + '.' : 'Move the goal date under Runway → Bridge fund.' });
+}
+
+/* ---------- stay-home: Sami home with the kids by about 2031 ---------- */
+function stayRow() {
+  const st = S.set.stay, p = S.set.people[st.who]; if (!p || !p.gross) return null;
+  const c = calc(), take = (p.gross - p.taxes - p.pretaxOther - p.otherPost - p.hsa - p.gross * st.k401Pct / 100) * S.set.paychecks / 12;
+  const prem = +st.familyPremium || 0, need = c.planned + prem, spare = take - need;
+  return { l: band(take, need), t: 'Stay-home test: ' + p.label + '’s pay alone ' + (spare >= 0 ? 'covers' : 'doesn’t cover') + ' today’s spending', v: (spare >= 0 ? '+' : '') + fmt(spare) + '/mo',
+    d: p.label + '’s take-home with a ' + st.k401Pct + '% Roth 401(k) (' + fmt(take) + ') − YNAB targets (' + fmt(c.planned) + ') − family coverage (' + fmt(prem) + ') = ' + fmt(spare) + ' a month. Kid costs come on top; raises and the bridge fund cover those.',
+    h: 'Today’s spending is more than ' + p.label + '’s pay alone can carry', fix: 'Bring YNAB targets down by ' + fmt(-spare) + ' a month (the Spending tab lists where), or plan on a larger bridge fund.' };
+}
+function pathRow() {
+  const st = S.set.stay, p = S.set.people[st.who]; if (!p || !p.gross) return null;
+  const now = p.gross * S.set.paychecks, yrs = Math.max(0, Math.floor(daysBetween(st.baseDate, todayIso()) / 365.25));
+  const floor = st.baseGross * Math.pow(1 + st.floorPct / 100, yrs), path = st.baseGross * Math.pow(1 + st.pathPct / 100, yrs);
+  const nxt = st.baseGross * Math.pow(1 + st.pathPct / 100, yrs + 1), nd = (+st.baseDate.slice(0, 4) + yrs + 1) + st.baseDate.slice(4, 7);
+  return { l: band(now, floor), t: p.label + '’s regular pay: ' + fmt(now) + ' a year', v: now >= path - 1 ? 'on the path' : now >= floor - 1 ? 'within plan' : 'below plan',
+    d: 'The bridge fund was sized for raises of at least ' + st.floorPct + '% a year (' + fmt(floor) + ' today). Next checkpoint: about ' + fmt(nxt) + ' by ' + monthLabel(nd) + ' on the ' + st.pathPct + '% path, where no bridge would be needed.',
+    h: p.label + '’s pay is behind the raise pace the plan assumes', fix: 'Pay is ' + fmt(floor - now) + ' a year below the ' + st.floorPct + '% pace. Raise the bridge target, or push the stay-home date back, at the next check-in.' };
+}
+
+/* ---------- per-tab status ---------- */
+function statusRetire() {
+  const st = S.set, P = st.people, y = st.year, rows = [];
+  Object.keys(P).forEach(k => {
+    const p = P[k]; if (!p.gross) return;
+    const cur = p.roth401k / p.gross * 100, tg = (st.k401Target || {})[k] || {};
+    if (p.matchNeeds && cur + 0.01 < p.matchNeeds) rows.push({ l: 'bad', t: p.label + '’s 401(k) misses part of the employer match', v: cur.toFixed(1) + '%', d: 'The full match needs ' + p.matchNeeds + '% of pay.', fix: 'Raise ' + p.label + '’s Roth 401(k) to at least ' + p.matchNeeds + '% (' + fmt2(p.gross * p.matchNeeds / 100) + ' a check) in payroll.' });
+    if (+tg.pct) {
+      const amt = fmt2(p.gross * tg.pct / 100);
+      if (cur + 0.05 >= tg.pct) rows.push({ l: 'ok', t: p.label + '’s Roth 401(k) is at its ' + tg.pct + '% target', v: cur.toFixed(1) + '%', d: fmt2(p.roth401k) + ' a check.' });
+      else if (tg.from && todayIso() < tg.from) rows.push({ l: dueLevel(tg.from) === 'ok' ? 'ok' : 'warn', t: p.label + '’s Roth 401(k) goes to ' + tg.pct + '% on ' + niceDate(tg.from), v: cur.toFixed(1) + '% now', d: 'About ' + amt + ' a check at ' + tg.pct + '%.', fix: 'Change the election in payroll before ' + niceDate(tg.from) + ' (' + amt + ' a check).' });
+      else rows.push({ l: band(cur, tg.pct), t: p.label + '’s Roth 401(k) is below its ' + tg.pct + '% target', v: cur.toFixed(1) + '%', d: fmt2(p.roth401k) + ' a check now; the target is ' + amt + '.', fix: 'Change the election in payroll to ' + tg.pct + '% (' + amt + ' a check), then apply the next stub.' });
+    }
+    if (y >= 2027 && /^sami$/i.test(p.label) && +p.hsaSeed > 0) rows.push({ l: 'warn', t: 'The app still counts a ' + fmt(p.hsaSeed) + ' employer HSA seed for Sami', d: 'Allina ended the seed after 2026, so her HSA would fall short.', fix: 'Set Sami’s employer HSA seed to $0 under Update → Settings, and her HSA to the full limit.' });
+  });
+  tracker().forEach(r => {
+    const p = P[r.k], rem = remaining(p.next, y);
+    if (r.left < -1) { rows.push({ l: 'bad', t: r.who + '’s ' + r.acct + ' is on pace to go over the ' + y + ' limit', v: 'over ' + fmt(-r.left), d: 'Projected ' + fmt(r.proj) + ' against ' + fmt(r.lim) + '. Excess contributions are taxed 6% a year until fixed.', fix: rem ? 'Lower it by ' + fmt2(-r.left / rem) + ' a check for the ' + rem + ' checks left, or ask the custodian to remove the excess.' : 'Ask the custodian to remove the excess.' }); return; }
+    if (!r.hsa && !r.ira) return;
+    const due = r.ira ? (y + 1) + '-04-15' : y + '-12-31', lab = r.who + '’s ' + y + ' ' + (r.ira ? 'Roth IRA' : 'HSA');
+    if (r.done || r.left < 1) { rows.push({ l: 'ok', t: lab + (r.done ? ' is done' : ' is on pace to max'), v: fmt(Math.min(r.proj, r.lim)) + ' of ' + fmt(r.lim) }); return; }
+    const dl = dueLevel(due);
+    if (r.hsa) rows.push({ l: dl === 'bad' || r.left > 0.1 * r.lim ? 'bad' : 'warn', t: lab + ' is on pace to fall ' + fmt(r.left) + ' short', v: fmt(r.proj) + ' of ' + fmt(r.lim), d: 'Deadline ' + niceDate(due) + '.', fix: (rem ? 'Add ' + fmt2(r.left / rem) + ' a check for the ' + rem + ' checks left, or deposit ' : 'Deposit ') + fmt(r.left) + ' before ' + niceDate(due) + '.' });
+    else rows.push({ l: dl, t: lab + ' has ' + fmt(r.left) + ' of room', v: 'due ' + niceDate(due), d: 'Projected ' + fmt(r.proj) + ' of ' + fmt(r.lim) + '.', fix: 'Put in ' + fmt(r.left) + ' by ' + niceDate(due) + ' (through the backdoor if income is over the limit).' });
+  });
+  if (S.snap) S.snap.accts.filter(a => /traditional ira|rollover ira/i.test(a.n) && a.bal > 1).forEach(a => rows.push({ l: dueLevel(y + '-12-31'), t: a.n + ' holds ' + fmt(a.bal), v: 'by ' + niceDate(y + '-12-31'), d: 'For the backdoor Roth, the traditional IRA should be $0 on Dec 31.', fix: 'Convert it to the Roth IRA before Dec 31.' }));
+  return mkStatus(rows, 'On track to fill this year’s tax-advantaged room.', false);
+}
+function statusPay() {
+  const st = S.set, P = st.people, rows = [], today = todayIso();
+  Object.keys(P).forEach(k => {
+    const p = P[k];
+    if (!p.gross) { rows.push({ l: 'warn', t: 'No pay stub applied for ' + p.label, fix: 'Drop ' + p.label + '’s latest pay stub PDF on the Update tab and apply it.' }); return; }
+    const late = p.next ? daysBetween(p.next, today) : 0;
+    if (late > 3) rows.push({ l: 'warn', t: p.label + '’s ' + niceDate(p.next) + ' pay stub isn’t in the app yet', v: late + ' days', d: 'Pay figures and year-to-date contributions come from the newest stub.', fix: 'Download it from the payroll site and drop it on the Update tab.' });
+    const m = payModel(k), lr = m.rows.slice().reverse().find(r => r.base && !r.partial);
+    if (lr && Math.abs(lr.base - p.gross) > 1) rows.push({ l: 'warn', t: p.label + '’s newest stub shows different pay', v: fmt2(lr.base) + ' vs ' + fmt2(p.gross), fix: 'Apply the ' + niceDate(lr.d) + ' stub on the Update tab.' });
+    if (depUnmapped(k)) rows.push({ l: 'warn', t: p.label + '’s deposit accounts aren’t assigned', d: 'Brokerage and money market deposits count as checking until they are.', fix: 'Assign them under Update → Settings → Direct deposit accounts.' });
+  });
+  const pc = S.snap ? payCheck() : null, iss = S.snap ? payCheckIssues() : [];
+  iss.slice(0, 4).forEach(x => rows.push({ l: 'bad', t: x.who + '’s ' + niceDate(x.check) + ' deposit ' + (x.st === 'missing' ? 'is missing from YNAB' : x.st === 'differs' ? 'doesn’t match YNAB' : 'is in YNAB but not on the stub'), v: fmt2(x.st === 'extra' ? x.ynabAmt : x.amt),
+    d: 'Account ending ' + x.last4 + (x.acct ? ' (' + x.acct + ')' : '') + (x.st === 'differs' ? '; YNAB shows ' + fmt2(x.ynabAmt) : '') + '.',
+    fix: x.st === 'missing' ? 'Find the ' + fmt2(x.amt) + ' deposit in ' + x.acct + ' and enter or match it in YNAB.' : x.st === 'differs' ? 'Check which amount is right and fix it in YNAB.' : 'Confirm that deposit really stopped, or add the missing stub.' }));
+  if (pc && pc.length && !iss.length) rows.push({ l: 'ok', t: 'Paycheck deposits match YNAB', v: sum(pc, c => c.rows.filter(x => x.st === 'ok').length) + ' deposits', d: 'Last ' + pc.length + ' checks with deposit detail.' });
+  rows.push(pathRow());
+  return mkStatus(rows, 'Paychecks reconcile with YNAB, and pay is on plan.');
+}
+function lastFullIdx() { const sn = S.snap, cur = sn.asOf.slice(0, 7); let j = sn.months.length - 1; while (j >= 0 && sn.months[j] >= cur) j--; return j; }
+function statusLoans() {
+  const sn = S.snap, L = loanList(), rows = [], j = lastFullIdx(); if (!L.length) return mkStatus([], 'No student loans found.');
+  const iraOpen = tracker().some(r => r.ira && !r.done && r.left > 1), ml = j >= 0 ? monthLabel(sn.months[j]) : '';
+  let extra = 0, paidAll = 0;
+  L.forEach(l => {
+    if (!l.rate) rows.push({ l: 'warn', t: 'No interest rate entered for ' + l.name, fix: 'Enter it on the Loans tab.' });
+    const cat = sn.cats.find(c => c.c === l.name); if (!cat || j < 0) return;
+    const paid = -cat.x[j], min = Math.max(0, cat.a[j]); paidAll += paid;
+    if (min > 0 && paid + 1 < min) rows.push({ l: paid > 0 && paid >= 0.9 * min ? 'warn' : 'bad', t: l.name + ': the ' + ml + ' payment looks short', v: fmt2(paid) + ' of ' + fmt2(min), fix: 'Check autopay with the servicer and pay the ' + fmt2(min - paid) + ' difference.' });
+    else extra += Math.max(0, paid - min);
+  });
+  if (extra > 5 && iraOpen) rows.push({ l: 'warn', t: fmt(extra) + ' extra went to loans in ' + ml + ' while Roth IRA room is open', d: 'The plan keeps loans at their minimums while Roth space is available.', fix: 'Stop the extra payments and send that ' + fmt(extra) + ' a month to the Roth IRA or the bridge fund.' });
+  if (j >= 0 && !rows.some(r => r.l !== 'ok')) rows.push({ l: 'ok', t: 'Minimums paid in ' + ml, v: fmt(paidAll) });
+  return mkStatus(rows, 'Minimums paid, and nothing extra while Roth room is open.');
+}
+function statusRunway() {
+  const st = S.set, P = st.people, t = typeTotals(curIdx()), ns = monthlyNeeds(), rows = [];
+  if (ns > 0) { const goal = st.monthsTarget * ns; rows.push({ l: band(t.emergency, goal), t: 'Emergency fund: ' + (t.emergency / ns).toFixed(1) + ' months of needs', v: fmt(t.emergency) + ' of ' + fmt(goal), d: 'Target ' + st.monthsTarget + ' months of needs (' + fmt(ns) + ' a month) while you both work.', h: 'The emergency fund is below ' + st.monthsTarget + ' months of needs', fix: 'Move ' + fmt(goal - t.emergency) + ' into the emergency fund.' }); }
+  rows.push(stayRow());
+  Object.keys(P).forEach(k => {
+    const other = Object.keys(P).find(x => x !== k); if (!other || !P[other].gross) return;
+    const added = +(k === 'sami' ? st.runway.addedSami : st.runway.added) || 0, th = takeHome(other), need = ns + added;
+    rows.push({ l: band(th, need), t: 'If ' + P[k].label + '’s pay stopped, ' + P[other].label + '’s covers needs', v: fmt(th) + ' vs ' + fmt(need), d: P[other].label + '’s full take-home against needs' + (added ? ' plus ' + fmt(added) + ' of added costs' : '') + '.', fix: 'Needs run ' + fmt(need - th) + ' a month over one paycheck; trim needs or keep a larger emergency fund.' });
+  });
+  if (!(+st.runway.addedSami > 0)) rows.push({ l: 'warn', t: 'No added cost is set for the case where Sami’s pay stops', d: 'Adding Sami to Switchback’s 2027 plan costs about $293.22 a month ($613.10 with kids).', fix: 'Enter 293.22 under Update → Settings → If Sami leaves her job.' });
+  rows.push(bridgeRow());
+  return mkStatus(rows, 'Either paycheck covers your needs, and the bridge fund is on schedule.');
+}
+function statusPlan() {
+  const open = steps().filter(x => !x.done), rows = [];
+  open.filter(x => x.due).forEach(x => { const l = dueLevel(x.due), d = daysBetween(todayIso(), x.due); if (l !== 'ok') rows.push({ l, t: x.t, v: l === 'bad' ? 'overdue' : 'due ' + niceDate(x.due), d: x.n, fix: l === 'bad' ? 'It was due ' + niceDate(x.due) + '. Do it now, or remove or re-date it on the Plan tab if it no longer applies.' : 'Due in ' + d + (d === 1 ? ' day' : ' days') + ', on ' + niceDate(x.due) + '.' }); });
+  const nxt = open.filter(x => x.due && dueLevel(x.due) === 'ok').sort((a, b) => (a.due < b.due ? -1 : 1))[0];
+  rows.push({ l: 'ok', t: open.length + (open.length === 1 ? ' open step' : ' open steps') + (nxt ? '; next: ' + nxt.t : ''), v: nxt ? 'by ' + niceDate(nxt.due) : '' });
+  return mkStatus(rows, 'Nothing overdue or due in the next 14 days.', false);
+}
+
+/* ---------- spending: YNAB activity against targets, with trends ---------- */
+function spendModel() {
+  const sn = S.snap, i = curIdx(), jf = lastFullIdx();
+  const full = []; for (let j = 0; j <= jf; j++) full.push(j);
+  const l3 = full.slice(-3), l12 = full.slice(-12);
+  const cats = sn.cats.map(c => {
+    const kind = kindOf(c.g, c.c); if (kind === 'ignore') return null;
+    const sp = j => -c.x[j], avg = js => js.length ? sum(js, sp) / js.length : 0;
+    const over = j => c.a[j] > 0 ? sp(j) > c.a[j] + Math.max(10, 0.05 * c.a[j]) : sp(j) > 25; // small misses don't count
+    return { c: c.c, g: c.g, kind, tgt: Math.max(0, c.a[i]), a3: avg(l3), a12: avg(l12), overN: l3.filter(over).length, raw: c };
+  }).filter(Boolean);
+  const live = cats.filter(c => c.kind !== 'sink'); // yearly (sinking) funds are lumpy, so they stay out of month-to-month comparisons
+  const spentAt = (j, list) => sum(list || live, c => -c.raw.x[j]), tgtAt = (j, list) => sum(list || live, c => Math.max(0, c.raw.a[j]));
+  return { i, jf, full, l3, l12, cats, live, spentAt, tgtAt };
+}
+function recurring() {
+  const sn = S.snap, tx = sn.tx || [], start = isoAdd(sn.asOf, -190), by = {}, first = {};
+  tx.forEach(x => {
+    if (x.m >= 0 || !x.p || /^transfer\s*:/i.test(x.p) || /starting balance|reconcil/i.test(x.p)) return;
+    const ty = acctType(x.a); if (ty !== 'cash' && ty !== 'card') return;
+    if (x.c && kindOf(x.g, x.c) === 'ignore') return;
+    if (!first[x.p] || x.d < first[x.p]) first[x.p] = x.d;
+    if (x.d >= start) (by[x.p] = by[x.p] || []).push(x);
+  });
+  const oldest = tx.length ? tx[tx.length - 1].d : sn.asOf, out = [];
+  Object.keys(by).forEach(p => {
+    const L = by[p], mset = new Set(L.map(x => x.d.slice(0, 7))); if (mset.size < 3 || L.length > mset.size * 1.5) return;
+    const am = L.map(x => -x.m).sort((a, b) => a - b), med = am[Math.floor(am.length / 2)];
+    const steady = am.filter(a => Math.abs(a - med) <= Math.max(1, 0.15 * med)).length; if (steady < 3 || steady < 0.7 * am.length) return;
+    out.push({ p, amt: med, c: L[0].c || '', last: L[0].d, n: mset.size, isNew: first[p] > isoAdd(sn.asOf, -100) && oldest < isoAdd(sn.asOf, -150) });
+  });
+  return out.sort((a, b) => b.amt - a.amt);
+}
+function feeTx() {
+  const sn = S.snap, from = isoAdd(sn.asOf, -90);
+  return (sn.tx || []).filter(x => x.d >= from && x.m < 0 && acctType(x.a) === 'card' && /interest charge|finance charge|purchase interest|late (payment )?fee|interest/i.test((x.p || '') + ' ' + (x.c || '')));
+}
+function payeeTrend() {
+  const sn = S.snap, a = isoAdd(sn.asOf, -90), b = isoAdd(sn.asOf, -180), now = {}, pre = {};
+  (sn.tx || []).forEach(x => {
+    if (x.m >= 0 || !x.p || /^transfer\s*:/i.test(x.p) || x.d < b) return;
+    const ty = acctType(x.a); if (ty !== 'cash' && ty !== 'card') return; if (x.c && kindOf(x.g, x.c) === 'ignore') return;
+    const o = x.d >= a ? now : pre; o[x.p] = (o[x.p] || 0) - x.m;
+  });
+  return Object.keys(now).map(p => ({ p, now: now[p], pre: pre[p] || 0 })).sort((x, y) => y.now - x.now).slice(0, 10);
+}
+function savingIdeas(M) {
+  const out = [], seen = new Set();
+  M.cats.filter(c => c.kind === 'flex' && c.tgt > 0 && M.l3.length && c.a3 > c.tgt + 10).forEach(c => { seen.add(c.c); out.push({ k: 'over', c: c.c, t: c.c + ' averages ' + fmt(c.a3) + ' a month against a ' + fmt(c.tgt) + ' target', yr: (c.a3 - c.tgt) * 12, how: 'Hold it to the target' }); });
+  M.cats.filter(c => c.kind === 'flex' && !seen.has(c.c) && M.l12.length >= 6 && c.a12 > 0 && c.a3 > c.a12 * 1.15 && c.a3 - c.a12 > 50).forEach(c => { seen.add(c.c); out.push({ k: 'rise', c: c.c, t: c.c + ' is up ' + pct(c.a3 / c.a12 - 1) + ' on its 12-month average (' + fmt(c.a3) + ' vs ' + fmt(c.a12) + ')', yr: (c.a3 - c.a12) * 12, how: 'Get back to the usual level' }); });
+  const rec = recurring().filter(r => r.amt < 200); const rt = sum(rec, r => r.amt);
+  if (rec.length) out.push({ k: 'rec', t: rec.length + ' recurring charges under $200 add up to ' + fmt(rt) + ' a month (listed below)', yr: rt * 12, how: 'Review each one; this is the total if all were cancelled' });
+  const fees = feeTx(), ft = -sum(fees, x => x.m); if (ft > 0) out.push({ k: 'fee', t: fmt(ft) + ' of card interest or fees in the last 90 days', yr: ft * 4, how: 'Pay cards in full and ask for a waiver' });
+  M.cats.filter(c => c.kind === 'flex' && !seen.has(c.c) && c.a3 >= 150).sort((a, b) => b.a3 - a.a3).slice(0, 3).forEach(c => out.push({ k: 'trim', c: c.c, t: c.c + ' is one of your biggest flexible categories at ' + fmt(c.a3) + ' a month', yr: c.a3 * 0.1 * 12, how: 'If trimmed by 10%' }));
+  return out.sort((a, b) => b.yr - a.yr);
+}
+function statusSpending() {
+  const sn = S.snap, M = spendModel(), rows = [], c = calc(), mon = latestMonth(), pace = paceFor(mon);
+  const now = monthRows(mon), flex = now.filter(r => r.kind === 'flex'), fT = sum(flex, r => Math.max(0, r.a)), fS = sum(flex, r => r.spent);
+  const y = +sn.asOf.slice(0, 4), m = +sn.asOf.slice(5, 7), dim = new Date(y, m, 0).getDate(), dLeft = mon === sn.asOf.slice(0, 7) ? dim - +sn.asOf.slice(8, 10) : 0;
+  if (fT > 0) {
+    const exp = fT * pace, l = fS <= exp + 0.1 * fT ? 'ok' : (fS <= exp + 0.2 * fT && fS <= fT ? 'warn' : 'bad');
+    rows.push({ l, t: 'Flexible spending in ' + monthLabel(mon) + ': ' + fmt(fS) + ' of ' + fmt(fT), v: pct(fS / fT) + ' used, ' + pct(pace) + ' of month', h: 'Flexible spending is running ahead of the month', d: 'Everyday categories, not bills or yearly funds.', fix: fS < fT ? 'Keep flexible spending to ' + fmt(fT - fS) + ' for the last ' + dLeft + ' days (about ' + fmt((fT - fS) / Math.max(1, dLeft)) + ' a day).' : 'The flexible targets are used up. Pause non-essentials and cover the ' + fmt(fS - fT) + ' from Ready to Assign or a yearly fund.' });
+  }
+  const donor = flex.filter(r => r.left > 0).sort((a, b) => b.left - a.left)[0];
+  now.filter(r => r.spent > r.a + 1 && r.kind !== 'sink').sort((a, b) => (b.spent - b.a) - (a.spent - a.a)).slice(0, 3).forEach(r => rows.push({ l: 'bad', t: r.c + ' is over its target this month', v: 'over ' + fmt(r.spent - r.a), d: fmt(r.spent) + ' spent of ' + fmt(Math.max(0, r.a)) + '.', fix: 'Cover the ' + fmt(r.spent - r.a) + ' in YNAB' + (donor && donor.c !== r.c ? ' from ' + donor.c + ' (' + fmt(donor.left) + ' left)' : '') + ', and hold off on more ' + r.c + ' this month.' }));
+  if (M.jf >= 0) {
+    const j = M.jf, sp = M.spentAt(j), tg = M.tgtAt(j), worstC = M.live.map(x => ({ c: x.c, o: -x.raw.x[j] - Math.max(0, x.raw.a[j]) })).filter(x => x.o > 1).sort((a, b) => b.o - a.o).slice(0, 2);
+    rows.push({ l: bandMax(sp, tg), t: monthLabel(sn.months[j]) + ': spent ' + fmt(sp) + ' of ' + fmt(tg) + ' targeted', v: sp <= tg ? fmt(tg - sp) + ' under' : fmt(sp - tg) + ' over', d: 'Bills and everyday categories; yearly funds left out.', h: 'Last month ran over its targets', fix: 'Last month went ' + fmt(sp - tg) + ' over' + (worstC.length ? ', mostly ' + worstC.map(x => x.c + ' (+' + fmt(x.o) + ')').join(' and ') : '') + '. Hold those categories to their targets this month.' });
+  }
+  const repeat = M.cats.filter(x => x.kind !== 'sink' && x.overN >= 2 && M.l3.length === 3).sort((a, b) => (b.a3 - b.tgt) - (a.a3 - a.tgt));
+  repeat.slice(0, 3).forEach(x => rows.push({ l: 'warn', t: x.c + ' went over target in ' + x.overN + ' of the last 3 months', v: fmt(x.a3) + '/mo vs ' + fmt(x.tgt), fix: x.a3 > x.tgt ? 'Cut back to ' + fmt(x.tgt) + ' (saves ' + fmt((x.a3 - x.tgt) * 12) + ' a year), or raise the target to about ' + fmt(x.a3) + ' and lower another one by ' + fmt(x.a3 - x.tgt) + '.' : 'Recent months are back near the target; keep it there.' }));
+  const rep = new Set(repeat.slice(0, 3).map(x => x.c));
+  M.cats.filter(x => x.kind === 'flex' && !rep.has(x.c) && M.l12.length >= 6 && x.a12 > 0 && x.a3 > x.a12 * 1.15 && x.a3 - x.a12 > 50).sort((a, b) => (b.a3 - b.a12) - (a.a3 - a.a12)).slice(0, 3)
+    .forEach(x => rows.push({ l: 'warn', t: x.c + ' is up ' + pct(x.a3 / x.a12 - 1) + ' on its usual level', v: fmt(x.a3) + '/mo vs ' + fmt(x.a12), d: 'Last 3 months against the last 12.', fix: 'Getting back to the 12-month average saves ' + fmt((x.a3 - x.a12) * 12) + ' a year.' }));
+  const plan = +S.set.spend.plan || 0;
+  if (plan > 0) { const ago = M.i >= 3 ? sum(M.cats, x => Math.max(0, x.raw.a[M.i - 3])) : null; rows.push({ l: bandMax(c.planned, plan), t: 'Monthly targets: ' + fmt(c.planned) + ' against the ' + fmt(plan) + ' plan', v: c.planned <= plan ? 'within plan' : '+' + fmt(c.planned - plan), d: ago != null ? 'Three months ago they totalled ' + fmt(ago) + '.' : '', h: 'Monthly targets have crept above the plan', fix: 'Trim targets by ' + fmt(c.planned - plan) + ' a month. Every dollar of targets above the plan comes out of the stay-home cushion and the bridge fund.' }); }
+  const fees = feeTx(); if (fees.length) rows.push({ l: 'bad', t: 'Card interest or fees in the last 90 days', v: fmt(-sum(fees, x => x.m)), d: fees.slice(0, 3).map(x => niceDate(x.d) + ' ' + x.p).join('; ') + '.', fix: 'Pay the card statement in full, and call the issuer to ask for a one-time waiver.' });
+  return mkStatus(rows, 'Spending is within your YNAB targets.');
+}
+function barChart(vals, tgts, labels) {
+  const W = 640, H = 220, L = 52, R = 14, T = 14, B = 26, n = vals.length; if (!n) return '';
+  const mx = Math.max.apply(null, vals.concat(tgts).concat([1])) * 1.1, bw = (W - L - R) / n, y = v => T + (H - T - B) * (1 - Math.max(0, v) / mx);
+  let g = '';
+  for (let k = 0; k <= 3; k++) { const v = mx * k / 3; g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--line)"/><text x="' + (L - 6) + '" y="' + (y(v) + 4).toFixed(1) + '" text-anchor="end">' + fmt(v / 1000, 1) + 'k</text>'; }
+  const bars = vals.map((v, i) => '<rect x="' + (L + i * bw + bw * 0.18).toFixed(1) + '" y="' + y(v).toFixed(1) + '" width="' + (bw * 0.64).toFixed(1) + '" height="' + Math.max(0, H - B - y(v)).toFixed(1) + '" rx="2" fill="' + (v > tgts[i] + 1 ? 'var(--bad)' : 'var(--accent)') + '"' + (i === n - 1 ? ' opacity=".55"' : '') + '><title>' + esc(labels[i]) + ': ' + fmt(v) + ' spent, ' + fmt(tgts[i]) + ' targeted</title></rect>').join('');
+  const tl = tgts.map((v, i) => '<line x1="' + (L + i * bw + bw * 0.08).toFixed(1) + '" x2="' + (L + (i + 1) * bw - bw * 0.08).toFixed(1) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="var(--ink)" stroke-width="2"/>').join('');
+  const xl = labels.map((lb, i) => (n <= 8 || i % 2 === (n - 1) % 2) ? '<text x="' + (L + i * bw + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lb) + '</text>' : '').join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Spending by month against targets">' + g + bars + tl + xl + '</svg>' +
+    '<div class="legend"><span><i style="background:var(--accent)"></i>Spent, within target</span><span><i style="background:var(--bad)"></i>Spent, over target</span><span><i style="background:var(--ink);height:3px"></i>Target</span><span>Lighter bar: this month so far</span></div>';
+}
+function spending() {
+  const sn = S.snap, s = statusSpending(), M = spendModel(), c = calc(), mon = latestMonth(), pace = paceFor(mon);
+  const js = M.full.slice(-12).concat(M.i > M.jf ? [M.i] : []);
+  let out = statusHtml(s);
+  const now = monthRows(mon).filter(r => r.kind !== 'sink');
+  const lv = r => level(r, pace), ord = { over: 0, watch: 1, ok: 2 };
+  now.sort((a, b) => (ord[lv(a).k] - ord[lv(b).k]) || (b.spent - a.spent));
+  const nRow = r => { const v = lv(r); return '<tr><th>' + esc(r.c) + '</th><td class="num">' + fmt(Math.max(0, r.a)) + '</td><td class="num">' + fmt(r.spent) + '</td><td class="num ' + (v.k === 'over' ? 'bad' : v.k === 'watch' ? 'warn' : 'good') + '">' + esc(v.t) + '</td></tr>'; };
+  const hot = now.filter(r => lv(r).k !== 'ok'), cool = now.filter(r => lv(r).k === 'ok');
+  out += '<section class="blk"><h2>' + monthLabel(mon) + ' so far</h2><p class="lede">' + pct(pace) + ' of the month has passed. Bills and everyday categories; yearly funds are left out.</p>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th>Category</th><th class="num">Target</th><th class="num">Spent</th><th class="num">Status</th></tr></thead><tbody>' + (hot.length ? hot.map(nRow).join('') : '<tr><td colspan="4" class="good">Every category is on pace.</td></tr>') + '</tbody></table></div>' +
+    (cool.length ? '<details><summary>On pace · ' + cool.length + ' categories</summary><div class="tw"><table class="stmt"><tbody>' + cool.map(nRow).join('') + '</tbody></table></div></details>' : '') + '</section>';
+  out += '<section class="blk"><h2>Month by month</h2><p class="lede">Spending against targets, same categories, last ' + js.length + ' months.</p>' + barChart(js.map(j => M.spentAt(j)), js.map(j => M.tgtAt(j)), js.map(j => monthShort(sn.months[j]))) + '</section>';
+  const tr = M.live.filter(x => M.l3.length && (x.a3 > 1 || x.a12 > 1)).map(x => Object.assign({ ch: x.a3 - x.a12 }, x)).sort((a, b) => b.ch - a.ch);
+  const tRow = x => '<tr><th>' + esc(x.c) + '</th><td class="num">' + fmt(x.a3) + '</td><td class="num">' + fmt(x.a12) + '</td><td class="num ' + (x.ch > 50 && x.a3 > x.a12 * 1.15 ? 'bad' : x.ch < -50 ? 'good' : '') + '">' + (x.ch >= 0 ? '+' : '') + fmt(x.ch) + '</td><td class="num">' + fmt(x.tgt) + '</td></tr>';
+  out += '<section class="blk"><h2>Trends</h2><p class="lede">Average a month over the last 3 full months against the last ' + M.l12.length + '. A category is flagged when it’s up more than 15% and more than $50 a month.</p>' +
+    '<div class="tw"><table class="stmt"><thead><tr><th>Category</th><th class="num">Last 3</th><th class="num">Last ' + M.l12.length + '</th><th class="num">Change</th><th class="num">Target</th></tr></thead><tbody>' + tr.slice(0, 10).map(tRow).join('') + '</tbody></table></div>' +
+    (tr.length > 10 ? '<details><summary>All ' + tr.length + ' categories</summary><div class="tw"><table class="stmt"><tbody>' + tr.slice(10).map(tRow).join('') + '</tbody></table></div></details>' : '') + '</section>';
+  const ideas = savingIdeas(M), B = bridgeCalc();
+  const sooner = isFinite(B.mo) && B.bal < B.target ? Math.round((B.mo - monthsTo(B.bal, B.plan + 100, B.target, 0)) * MO_DAYS) : 0;
+  out += '<section class="blk"><h2>Ways to spend less</h2><p class="lede">Worked out from your own numbers, biggest first. Money freed up goes to the bridge fund' + (sooner > 0 ? ': every $100 a month cut gets you to ' + fmt(B.target) + ' about ' + sooner + ' days sooner.' : '.') + '</p>' +
+    (ideas.length ? '<div class="tw"><table class="stmt"><thead><tr><th>Where</th><th>How</th><th class="num">Per year</th></tr></thead><tbody>' + ideas.slice(0, 8).map(x => '<tr><th>' + esc(x.t) + '</th><td>' + esc(x.how) + '</td><td class="num good">' + fmt(x.yr) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="good">Nothing stands out: every category is at or under its target and steady.</p>') + '</section>';
+  const rec = recurring(), rt = sum(rec, r => r.amt);
+  out += '<section class="blk"><h2>Recurring charges</h2><p class="lede">Payees charged a steady amount in at least 3 of the last 6 months: ' + fmt(rt) + ' a month in all. Worth a look once a quarter.</p>' +
+    (rec.length ? '<div class="tw"><table class="stmt"><thead><tr><th>Payee</th><th>Category</th><th class="num">Per month</th><th class="num">Per year</th><th class="num">Last</th></tr></thead><tbody>' + rec.map(r => '<tr><th>' + esc(r.p) + (r.isNew ? ' <span class="warn sm">new</span>' : '') + '</th><td class="muted">' + esc(r.c) + '</td><td class="num">' + fmt2(r.amt) + '</td><td class="num">' + fmt(r.amt * 12) + '</td><td class="num muted">' + niceDate(r.last) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="muted">None found yet. This needs a few months of transactions from a YNAB sync.</p>') + '</section>';
+  const pt = payeeTrend();
+  if (pt.length) out += '<section class="blk"><h2>Where the money went</h2><p class="lede">Top payees in the last 90 days, against the 90 days before.</p><div class="tw"><table class="stmt"><thead><tr><th>Payee</th><th class="num">Last 90 days</th><th class="num">90 days before</th></tr></thead><tbody>' + pt.map(x => '<tr><th>' + esc(x.p) + '</th><td class="num">' + fmt(x.now) + '</td><td class="num muted">' + fmt(x.pre) + '</td></tr>').join('') + '</tbody></table></div></section>';
+  return out;
+}
+function bridgeBlock() {
+  const B = bridgeCalc(), b = S.set.bridge, ph = B.plan > 0 ? 1 : 0;
+  const pr = Math.max(0, Math.min(1, B.bal / (B.target || 1)));
+  const ln = (lab, v, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><th>' + lab + '</th><td class="num">' + v + '</td></tr>';
+  const inp = (k, lab, type, step) => '<div class="fld"><label for="cf-' + k + '">' + lab + '</label><input id="cf-' + k + '" type="' + (type || 'number') + '"' + (step ? ' step="' + step + '"' : '') + ' value="' + esc(b[k]) + '" data-a="cfg" data-k="bridge.' + k + '"></div>';
+  return '<section class="blk"><h2>Bridge fund</h2><p class="lede">The joint brokerage, plus money market cash on its way there. It carries the gap between ' + esc(B.who) + '’s pay and your spending once Sami is home; anything above the target is flexible money.</p>' +
+    '<div class="kpis"><div class="kpi"><div class="v">' + fmt(B.bal) + '</div><div class="l">today, of ' + fmt(B.target) + '</div></div><div class="kpi"><div class="v">' + (B.bal >= B.target ? 'Reached' : B.date ? monthLabel(B.date.slice(0, 7)) : 'Never') + '</div><div class="l">projected, ' + (ph ? 'at the planned ' + fmt(B.plan) + ' a month' : 'no deposits planned') + '</div></div><div class="kpi"><div class="v">' + (B.bal >= B.target ? '—' : isFinite(B.need) ? fmt(B.need) : '—') + '</div><div class="l">a month needed to hit ' + niceDate(B.by) + '</div></div></div>' +
+    '<div class="track" style="margin:14px 0 6px;max-width:640px"><div class="fill" style="width:' + (pr * 100).toFixed(1) + '%"></div></div>' +
+    '<div class="two"><div><h3>Going in each month</h3><table class="stmt"><tbody>' + ln('Brokerage deposits from pay', fmt(B.fromPay - (calc().sv.moneyMarket / 12))) + ln('Money market deposits from pay', fmt(calc().sv.moneyMarket / 12)) + ln('Leftover after YNAB targets', fmt(B.left)) + ln('Planned', fmt(B.plan), 'total') + ln('Actually went in, last 3 months', B.actual != null ? fmt(B.actual) + ' a month' : 'needs 3 full months of data') + '</tbody></table></div>' +
+    '<div><h3>When it reaches ' + fmt(B.target) + '</h3><table class="stmt"><tbody>' + ln('At the planned pace, no growth', B.date ? niceDate(B.date) : 'never') + (B.ret ? ln('With ' + B.ret + '% a year growth', B.dateR ? niceDate(B.dateR) : 'never') : '') + ln('At the actual pace' + (B.ret ? ', with growth' : ''), B.dateA ? niceDate(B.dateA) : '—') + ln('Goal date', niceDate(B.by), 'total') + '</tbody></table>' +
+    '<p class="muted" style="font-size:13px">Projected date = today + (target − balance) ÷ monthly deposits, compounding monthly when a return is set.</p></div></div>' +
+    '<details><summary>Bridge fund settings</summary>' + inp('target', 'Target', 'number', '1000') + inp('by', 'Goal date', 'date') + inp('ret', 'Assumed return, % a year (0 is cautious)', 'number', '0.5') + inp('keepCash', 'Money market cash that stays in cash (taxes, Roth top-up, travel)', 'number', '10') +
+    '<p class="muted" style="font-size:13px">The balance is the brokerage plus any money market cash above the amount kept in cash. Balances only move when you reconcile them in YNAB. Actual deposits leave out reconciliation adjustments, dividends and interest, so market moves don’t count as saving.</p></details></section>';
+}
+function statusOverview() {
+  const tabs = [['spending', 'Spending', statusSpending], ['retire', 'Retirement', statusRetire], ['pay', 'Pay', statusPay], ['loans', 'Loans', statusLoans], ['runway', 'Runway', statusRunway], ['plan', 'Plan', statusPlan]];
+  const rows = [stayRow(), bridgeRow()];
+  tabs.forEach(t => { const s = t[2](), n = s.rows.filter(r => r.l === 'bad' || r.l === 'warn').length; rows.push({ l: s.l === 'na' ? 'warn' : s.l, t: t[1] + ': ' + s.h0, h: t[1] + ': ' + s.h0, v: n ? n + ' to look at' : '', tab: t[0], tabName: t[1] }); });
+  return mkStatus(rows, 'On track for Sami to stay home by about 2031.');
+}
+function statusSummary() {
+  const pick = s => ({ status: LV_TXT[s.l], headline: s.h, items: s.rows.map(r => { const o = { status: LV_TXT[r.l], item: r.t }; if (r.v) o.value = r.v; if (r.d) o.detail = r.d; if (r.fix && r.l !== 'ok') o.fix = r.fix; return o; }) });
+  const o = { overview: pick(statusOverview()) };
+  [['spending', statusSpending], ['retirement', statusRetire], ['pay', statusPay], ['loans', statusLoans], ['runway', statusRunway], ['plan', statusPlan]].forEach(x => { o[x[0]] = pick(x[1]()); });
+  o.overview.items.forEach(i => { if (/ to look at$/.test(i.value || '')) delete i.value; });
+  return o;
+}
+function bridgeSummary() {
+  const B = bridgeCalc(), r1 = x => x == null || !isFinite(x) ? null : Math.round(x);
+  return { balance: r1(B.bal), target: B.target, goalDate: B.by, includesMoneyMarketAboveKeep: r1(B.mm), moneyMarketKeptInCash: B.keep, plannedMonthly: r1(B.plan), plannedFromPay: r1(B.fromPay), plannedLeftover: r1(B.left), actualMonthlyLast3: r1(B.actual), assumedReturnPct: B.ret, projectedDateNoGrowth: B.date, projectedDateWithReturn: B.ret ? B.dateR : null, projectedDateActualPace: B.dateA, monthlyNeededForGoalDate: r1(B.need) };
+}
+function spendSummary() {
+  const sn = S.snap, M = spendModel(), c = calc(), r1 = x => Math.round(x), j = M.jf, mon = latestMonth(), now = monthRows(mon).filter(r => r.kind === 'flex');
+  return {
+    lastFullMonth: j >= 0 ? { month: sn.months[j], spent: r1(M.spentAt(j)), targeted: r1(M.tgtAt(j)) } : null,
+    thisMonthFlexible: { month: mon, spent: r1(sum(now, r => r.spent)), targeted: r1(sum(now, r => Math.max(0, r.a))), shareOfMonthPassed: +paceFor(mon).toFixed(2) },
+    monthlyTargets: r1(c.planned), monthlyTargetsPlan: +S.set.spend.plan || null,
+    last12Months: M.full.slice(-12).map(k => ({ month: sn.months[k], spent: r1(M.spentAt(k)), targeted: r1(M.tgtAt(k)) })),
+    risingCategories: M.cats.filter(x => x.kind === 'flex' && M.l12.length >= 6 && x.a12 > 0 && x.a3 > x.a12 * 1.15 && x.a3 - x.a12 > 50).map(x => ({ category: x.c, last3Avg: r1(x.a3), last12Avg: r1(x.a12), target: r1(x.tgt) })),
+    repeatOverspenders: M.cats.filter(x => x.kind !== 'sink' && x.overN >= 2 && M.l3.length === 3).map(x => ({ category: x.c, monthsOverOfLast3: x.overN, last3Avg: r1(x.a3), target: r1(x.tgt) })),
+    recurringCharges: (function () { const r = recurring(); return { count: r.length, monthlyTotal: r1(sum(r, x => x.amt)) }; })(),
+    savingIdeas: savingIdeas(M).slice(0, 6).map(x => ({ idea: x.t, how: x.how, perYear: r1(x.yr) }))
+  };
+}
+
 /* ---------- render ---------- */
 function render() {
   const app = $('#app'); if (!app) return;
@@ -1348,7 +1724,7 @@ function render() {
   let body;
   if (S.tab === 'update') body = update();
   else if (!S.snap && S.tab !== 'pay') body = emptyView();
-  else body = ({ overview, plan, retire, pay, loans, runway, insights }[S.tab] || overview)();
+  else body = ({ overview, spending, plan, retire, pay, loans, runway, insights }[S.tab] || overview)();
   const openSecs = new Set(Array.from(app.querySelectorAll('details[open] > summary')).map(x => x.textContent)); // keep expanded sections expanded across re-renders
   app.innerHTML = header() + '<main>' + (S.tab !== 'update' && S.msg ? '<div class="banner' + (S.msg.err ? ' err' : '') + '">' + esc(S.msg.t) + '</div>' : '') + body + '</main>';
   app.querySelectorAll('details > summary').forEach(x => { if (openSecs.has(x.textContent)) x.parentNode.open = true; });
@@ -1542,6 +1918,7 @@ document.addEventListener('change', ev => {
   else if (a === 'need') { const s = needsSet(); el.checked ? s.add(v) : s.delete(v); st.needs = Array.from(s); saveSettings(); render(); }
   else if (a === 'rw2') { st.runway.addedSami = Math.max(0, +el.value || 0); saveSettings(); render(); }
   else if (a === 'goals') { st.goals = el.value; saveSettings(); }
+  else if (a === 'cfg') { const ks = el.dataset.k.split('.'), last = ks.pop(); let o = st; ks.forEach(k => { o = o[k] = (o[k] && typeof o[k] === 'object') ? o[k] : {}; }); o[last] = el.type === 'date' ? el.value : (el.value === '' ? 0 : (+el.value || 0)); saveSettings(); render(); }
   else if (a === 'rw') { st.runway.added = Math.max(0, +el.value || 0); saveSettings(); render(); }
   else if (a === 'mt') { st.monthsTarget = Math.max(1, +el.value || 3); saveSettings(); render(); }
   else if (a === 'pc') { st.paychecks = Math.max(1, +el.value || 26); saveSettings(); render(); }
