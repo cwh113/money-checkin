@@ -244,13 +244,18 @@
     if (s.taxes !== undefined && s.src) { o.t = r2(s.taxes); o.r = r2(s.roth401k || 0); o.h = r2(s.hsa || 0); o.o = r2((s.pretaxOther || 0) + (s.otherPost || 0)); }
     if (s.match) o.m = r2(s.match);
     if (s.src) o.k = s.src;
+    if (s.deposits && s.deposits.length) o.dp = s.deposits.map(d => ({ a: d.last4, m: r2(d.amt) }));
     return o;
   }
   /* Merge records into a list: de-dupe on date+net, then fold checks issued the same day (split pay periods). */
   function mergeHistory(list, recs) {
-    const out = (list || []).slice(), seen = {};
-    out.forEach(x => { seen[x.d + '|' + x.n] = 1; });
-    (recs || []).forEach(x => { const k = x.d + '|' + x.n; if (!seen[k] && x.g > 0) { seen[k] = 1; out.push(x); } });
+    const out = (list || []).map(x => Object.assign({}, x)), seen = {};
+    out.forEach(x => { seen[x.d + '|' + x.n] = x; });
+    (recs || []).forEach(x => {
+      const k = x.d + '|' + x.n, old = seen[k];
+      if (old) { Object.keys(x).forEach(f => { if (old[f] === undefined) old[f] = x[f]; }); return; } // fill in detail an older record lacked, such as deposits
+      if (x.g > 0) { seen[k] = x; out.push(x); }
+    });
     out.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
     return out;
   }

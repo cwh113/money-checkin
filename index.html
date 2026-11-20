@@ -400,7 +400,7 @@ function defaults() {
     paychecks: 26, year: 2026,
     limits: { k401: 24500, hsa: 4400, ira: 7500, roLo: 242000, roHi: 252000 },
     people: { chris: person('Chris'), sami: person('Sami') },
-    checks: {}, depositMap: {}, history: {}, contrib: {}, steps: [],
+    checks: {}, depositMap: {}, depositYnab: {}, history: {}, contrib: {}, steps: [],
     goals: '',
     runway: { added: 0, addedSami: 0 }
   };
@@ -711,9 +711,69 @@ function rederiveDeposits(w) { // re-split brokerage, Roth IRA and money market 
   lt.deposits.forEach(d => { const k = dm[d.last4] || 'checking'; if (k === 'rothIra') ira += d.amt; else if (k === 'brokerage') brk += d.amt; else if (k === 'moneyMarket') mm += d.amt; });
   p.rothIra = Math.round(ira * 100) / 100; p.brokerage = Math.round(brk * 100) / 100; p.moneyMarket = Math.round(mm * 100) / 100;
 }
+function ynabGuess(a) { const ac = (S.snap && S.snap.accts) || []; const hit = ac.find(x => x.n.indexOf(a) >= 0); return hit ? hit.n : ''; }
+function depYnab(a) { const m = S.set.depositYnab || {}; return m[a] !== undefined ? m[a] : ynabGuess(a); }
+function depYnabSelect(a, id) {
+  if (!S.snap || !S.snap.accts) return '';
+  const cur = depYnab(a), opts = [['', 'Not set'], ['-', 'Not tracked in YNAB']].concat(S.snap.accts.map(x => [x.n, x.n]));
+  return '<div class="fld"><label for="' + id + 'y">Shows up in YNAB as</label><select id="' + id + 'y" data-a="depynab" data-v="' + a + '">' + opts.map(x => '<option value="' + esc(x[0]) + '"' + (cur === x[0] ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('') + '</select></div>';
+}
 function depSelect(a, amt, id) {
+  return depTypeSelect(a, amt, id) + depYnabSelect(a, id);
+}
+function depTypeSelect(a, amt, id) {
   const cur = (S.set.depositMap || {})[a] || '';
   return '<div class="fld"><label for="' + id + '">Account ending ' + a + ' (' + fmt2(amt) + ' on the newest stub)</label><select id="' + id + '" data-a="stubdep" data-v="' + a + '">' + (cur ? [] : [['', 'Not set (counts as checking)']]).concat([['checking', 'Checking or savings'], ['moneyMarket', 'Money market'], ['brokerage', 'Brokerage'], ['rothIra', 'Roth IRA']]).map(x => '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></div>';
+}
+/* Paycheck deposits vs YNAB: each deposit on a stub should appear as an inflow in the matching YNAB account. */
+function payCheck() {
+  const sn = S.snap; if (!sn || !sn.tx || !sn.tx.length) return null;
+  const asOf = sn.asOf, oldest = sn.tx.reduce((m, t) => (t.d < m ? t.d : m), asOf), used = new Set(), out = [];
+  const shift = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  Object.keys(S.set.people).forEach(k => {
+    const recs = ((S.set.history || {})[k] || []).filter(r => r.dp && r.dp.length && r.d >= shift(oldest, 3)).sort((a, b) => (a.d < b.d ? 1 : -1)).slice(0, 6);
+    const known = new Set(); ((S.set.history || {})[k] || []).forEach(r => (r.dp || []).forEach(d => known.add(d.a + '|' + d.m)));
+    recs.forEach(r => {
+      const lo = shift(r.d, -3), hi = shift(r.d, 5), rows = [];
+      r.dp.forEach(dp => {
+        const acct = depYnab(dp.a), row = { last4: dp.a, amt: dp.m, acct };
+        if (acct === '-') row.st = 'skip';
+        else if (!acct) row.st = 'unmapped';
+        else {
+          const cands = sn.tx.map((t, i) => [t, i]).filter(([t, i]) => t.a === acct && t.m > 0 && t.d >= lo && t.d <= hi && !used.has(i));
+          const hit = cands.find(([t]) => Math.abs(t.m - dp.m) < 0.01);
+          if (hit) { used.add(hit[1]); row.st = 'ok'; row.ynabDate = hit[0].d; }
+          else if (cands.length) { row.st = 'differs'; row.ynabAmt = cands[0][0].m; row.ynabDate = cands[0][0].d; used.add(cands[0][1]); }
+          else if (hi > asOf) row.st = 'pending';
+          else row.st = 'missing';
+        }
+        rows.push(row);
+      });
+      // YNAB inflows on payday in this person's deposit accounts that match an amount they used to get but this stub doesn't have (a deposit that should have stopped, or a stub we lack)
+      const accts = new Set(r.dp.map(d => depYnab(d.a)).filter(a => a && a !== '-'));
+      Object.keys(S.set.depositYnab || {}).forEach(l4 => { const a = depYnab(l4); if (a && a !== '-' && Array.from(known).some(x => x.split('|')[0] === l4)) accts.add(a); });
+      sn.tx.forEach((t, i) => {
+        if (used.has(i) || t.m <= 0 || !accts.has(t.a) || t.d < shift(r.d, -2) || t.d > shift(r.d, 3)) return;
+        const l4 = Object.keys(S.set.depositYnab || {}).concat(r.dp.map(d => d.a)).find(x => depYnab(x) === t.a);
+        if (l4 && known.has(l4 + '|' + (Math.round(t.m * 100) / 100)) && !r.dp.some(d => d.a === l4)) { used.add(i); rows.push({ last4: l4, amt: 0, acct: t.a, st: 'extra', ynabAmt: t.m, ynabDate: t.d }); }
+      });
+      out.push({ k, who: S.set.people[k].label, d: r.d, net: r.n, rows });
+    });
+  });
+  return out;
+}
+function payCheckIssues() { const pc = payCheck() || []; const iss = []; pc.forEach(c => c.rows.forEach(x => { if (['missing', 'differs', 'extra'].indexOf(x.st) >= 0) iss.push(Object.assign({ who: c.who, check: c.d }, x)); })); return iss; }
+function payCheckBlock() {
+  const pc = payCheck();
+  let h = '<section class="blk"><h2>Paychecks vs YNAB</h2><p class="lede">Each deposit on a pay stub should show up as an inflow in its YNAB account within a few days of payday. Accounts are paired under Settings \u2192 Paychecks \u2192 Direct deposit accounts.</p>';
+  if (!pc) return h + '<p class="muted">Sync YNAB first; the check uses the last 120 days of YNAB transactions.</p></section>';
+  if (!pc.length) return h + '<p class="muted">No recent checks with deposit detail yet. Drop your latest pay stub PDFs on the Update tab and apply them; older checks entered by hand or from CSV don\u2019t list deposits.</p></section>';
+  const lab = { ok: ['good', '\u2713 in YNAB'], pending: ['muted', 'not in YNAB yet (recent)'], missing: ['bad', 'missing from YNAB'], differs: ['bad', 'amount differs'], extra: ['bad', 'in YNAB, not on stub'], unmapped: ['muted', 'pick its YNAB account'], skip: ['muted', 'not tracked in YNAB'] };
+  pc.forEach(c => {
+    h += '<h3 style="margin-top:14px">' + esc(c.who) + ' \u00b7 ' + niceDate(c.d) + ' \u00b7 ' + fmt2(c.net) + ' take-home</h3><div class="tw"><table class="stmt"><thead><tr><th>Deposit</th><th class="num">Stub</th><th>YNAB account</th><th class="num">YNAB</th><th>Status</th></tr></thead><tbody>' +
+      c.rows.map(x => '<tr><th>Account ending ' + esc(x.last4) + '</th><td class="num">' + (x.st === 'extra' ? '\u2014' : fmt2(x.amt)) + '</td><td>' + esc(x.acct && x.acct !== '-' ? x.acct : '\u2014') + '</td><td class="num">' + (x.ynabAmt != null ? fmt2(x.ynabAmt) : x.st === 'ok' ? fmt2(x.amt) : '\u2014') + (x.ynabDate ? '<div class="sm muted">' + niceDate(x.ynabDate) + '</div>' : '') + '</td><td class="' + lab[x.st][0] + '">' + lab[x.st][1] + '</td></tr>').join('') + '</tbody></table></div>';
+  });
+  return h + '</section>';
 }
 function histSum(k, y, f) { return ((S.set.history || {})[k] || []).filter(r => r.d.slice(0, 4) === String(y) && r[f] != null).reduce((s, r) => s + r[f], 0); }
 function paydaysLeft(next, year, after) { // paydays from `next` through Dec 31, skipping any on or before `after`
@@ -993,6 +1053,7 @@ function flags() {
   Object.keys(P).forEach(k => { const m = payModel(k), lr = m.rows.slice().reverse().find(r => r.base && !r.partial); if (lr && P[k].gross && Math.abs(lr.base - P[k].gross) > 1) add('warn', P[k].label + '’s latest pay stub shows ' + fmt2(lr.base) + ' per paycheck but the app has ' + fmt2(P[k].gross) + '. Apply the stub on the Update tab.'); });
   steps().filter(x => !x.done && x.due && daysBetween(todayIso(), x.due) <= 60).forEach(x => add(daysBetween(todayIso(), x.due) < 0 ? 'bad' : 'warn', x.t + ' (due ' + niceDate(x.due) + ').'));
   const ty = +todayIso().slice(0, 4); if (ty > st.year) add('info', 'It\u2019s ' + ty + ' and the plan year is still ' + st.year + '. Once the ' + st.year + ' steps are done (Roth IRAs by Apr 15), switch the plan year under Settings and update the limits.');
+  payCheckIssues().forEach(x => add('warn', x.who + '\u2019s ' + niceDate(x.check) + ' paycheck: ' + (x.st === 'missing' ? fmt2(x.amt) + ' to the account ending ' + x.last4 + ' isn\u2019t in YNAB (' + x.acct + ').' : x.st === 'differs' ? 'the stub sends ' + fmt2(x.amt) + ' to the account ending ' + x.last4 + ', but YNAB shows ' + fmt2(x.ynabAmt) + ' in ' + x.acct + '.' : 'YNAB shows ' + fmt2(x.ynabAmt) + ' arriving in ' + x.acct + ' (account ending ' + x.last4 + ') but the stub has no such deposit. Check the deposit really stopped, or add the stub.') + ' See Pay \u2192 Paychecks vs YNAB.'));
   const st2 = stale(); if (st2.length) add('warn', st2.length + ' account(s) haven’t been reconciled recently: ' + st2.slice(0, 3).map(a => a.n).join(', ') + '.');
   const order = { bad: 0, warn: 1, info: 2, ok: 3 };
   return out.sort((a, b) => order[a.l] - order[b.l]);
@@ -1015,6 +1076,7 @@ function insightContext() {
     emergencyFundMonthsOfNeeds: ns ? +(t.emergency / ns).toFixed(1) : null, targetMonths: st.monthsTarget, monthlyNeeds: r1(ns), monthlyPlannedSpending: r1(c.planned), monthlyLeftOver: r1(c.surplus),
     annualGross: r1(c.gross), annualSavedThroughPayrollAndBrokerage: r1(c.savedAll), rothIraOutsidePayroll: r1(c.sv.lump), savingsRateOfGrossWithEmployer: c.gross > 0 ? +((c.savedAll + c.employer) / c.gross * 100).toFixed(1) : null, annualEmployerMoney: r1(c.employer), estimatedMAGI: r1(magiNow()), rothIraPhaseOut: [st.limits.roLo, st.limits.roHi],
     paychecksPerYear: st.paychecks, people,
+    paycheckDepositIssues: payCheckIssues().map(x => ({ who: x.who, check: x.check, account: x.last4, status: x.st, stub: x.amt || null, ynab: x.ynabAmt != null ? x.ynabAmt : null })),
     contributionRoom: tracker().map(r => ({ who: r.who, account: r.acct, projectedYear: r1(r.proj), limit: r.lim, roomLeft: r1(r.left), doneForYear: r.done, basis: r.src, actualSoFar: r.actual != null ? r.actual : null, actualAsOf: r.asOf || null })),
     overspentThisMonth: sn.cats.filter(x => kindOf(x.g, x.c) !== 'ignore' && x.v[i] < -1).map(x => ({ category: x.c, over: r1(-x.v[i]) })).slice(0, 8),
     loans: loanList().map(l => ({ loan: l.name, balance: r1(l.bal), ratePct: l.rate, minPayment: r1(l.min) })),
@@ -1138,7 +1200,7 @@ function pay() {
     lp += '<div><h3>' + esc(P[k].label) + ', ' + niceDate(l.d) + '</h3><table class="stmt"><tbody>' + rows.map(r => '<tr><th>' + r[0] + '</th><td class="num">' + fmt2(r[1]) + '</td></tr>').join('') + (l.i ? '<tr class="sub"><th>Taxable benefits that never reach you</th><td class="num">' + fmt2(-l.i) + '</td></tr>' : '') + '<tr class="total"><th>Take-home</th><td class="num">' + fmt2(l.n) + '</td></tr></tbody></table>' + (l.m ? '<p class="muted" style="font-size:13px">Employer 401(k) match on this check: ' + fmt2(l.m) + '.</p>' : '') + '</div>';
   });
   if (lp) out += '<section class="blk"><h3>Most recent checks</h3><div class="two">' + lp + '</div></section>';
-  return out + ledger() + '<section class="blk">' + hist + '</section>';
+  return out + payCheckBlock() + ledger() + '<section class="blk">' + hist + '</section>';
 }
 
 /* ---------- paycheck ledger: every check kept, exportable ---------- */
@@ -1459,6 +1521,7 @@ document.addEventListener('change', ev => {
       saveSettings(); S.msg = { t: added ? 'Added ' + added + ' check(s) from the file. Checks already on file were skipped.' : 'No new checks in that file.' }; render(); })
       .catch(() => { S.msg = { err: true, t: 'Could not read that file.' }; render(); }); }
   else if (a === 'stubwho') { P2.who = P2.who || {}; P2.who[v] = el.value; render(); }
+  else if (a === 'depynab') { st.depositYnab = st.depositYnab || {}; st.depositYnab[v] = el.value; saveSettings(); render(); }
   else if (a === 'stubdep' && el.value) { st.depositMap = st.depositMap || {}; st.depositMap[v] = el.value; Object.keys(st.people).forEach(w => { if (depAccts(w).some(x => x.last4 === v)) rederiveDeposits(w); }); saveSettings(); render(); }
   else if (a === 'restore') { restoreFile(el.files && el.files[0]); }
   else if (a === 'ynabbudget') { tokBudgetSet(el.value); render(); }
